@@ -138,8 +138,9 @@ def erp_user_login(request):
             {'success': False, 'message': 'Username and password required'},
             status=status.HTTP_400_BAD_REQUEST
         )
+    
     try:
-        user = ERPUser.objects.get(username=username, is_active=True)
+        user = ERPUser.objects.get(username=username)
         if check_password(password, user.password_hash):
             user.last_login = datetime.now()
             user.save()
