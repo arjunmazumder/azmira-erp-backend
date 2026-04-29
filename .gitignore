@@ -1,0 +1,4 @@
+.pro_env
+__pycache__/
+db.sqlite3
+.pro_env
