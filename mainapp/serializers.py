@@ -95,6 +95,8 @@ class ERPLandRecordSerializer(serializers.ModelSerializer):
 
 class ERPCustomerSerializer(serializers.ModelSerializer):
     referred_by_name = serializers.SerializerMethodField()
+    # is_active = serializers.BooleanField(default=True) 
+
 
     class Meta:
         model = ERPCustomer

@@ -278,7 +278,9 @@ class ERPCustomerDetailView(generics.RetrieveUpdateDestroyAPIView):
 class ERPCustomerCreateView(generics.CreateAPIView):
     queryset = ERPCustomer.objects.all()
     serializer_class = ERPCustomerSerializer
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    def perform_create(self, serializer):
+        # জোরপূর্বক ইজ অ্যাক্টিভ ট্রু করে সেভ করা
+        serializer.save(is_active=True)
 
 
 # =====================================================
