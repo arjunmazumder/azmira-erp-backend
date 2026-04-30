@@ -94,17 +94,15 @@ class ERPLandRecordSerializer(serializers.ModelSerializer):
 # ===== 5. CUSTOMER =====
 
 class ERPCustomerSerializer(serializers.ModelSerializer):
-    referred_by_name = serializers.SerializerMethodField()
-    # is_active = serializers.BooleanField(default=True) 
-
-
+    referred_by = serializers.SerializerMethodField()
     class Meta:
         model = ERPCustomer
         fields = '__all__'
 
-    def get_referred_by_name(self, obj):
-        return obj.referred_by.user.full_name if obj.referred_by else None
-
+    def get_referred_by(self, obj):
+        if obj.referred_by and obj.referred_by.user:
+            return obj.referred_by.user.full_name
+        return None
 
 # ===== 6. LEAD =====
 
