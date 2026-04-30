@@ -31,9 +31,10 @@ class ERPUserListSerializer(serializers.ModelSerializer):
         model = ERPUser
         fields = ['id', 'username', 'full_name', 'email', 'role', 'department', 'is_active']
 
-
 class ERPUserCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
+    # এখানে ডিফল্ট ভ্যালু সেট করে দিন
+    is_active = serializers.BooleanField(default=True) 
 
     class Meta:
         model = ERPUser
@@ -43,13 +44,12 @@ class ERPUserCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
-        user = ERPUser(**validated_data)
+        # এখানে validated_data-তে is_active না থাকলেও ডিফল্ট True পাবে
+        user = ERPUser.objects.create(**validated_data) 
         if password:
             user.password_hash = make_password(password)
-        user.save()
+            user.save()
         return user
-
-
 # ===== 2. PROJECT =====
 
 class ERPProjectSerializer(serializers.ModelSerializer):

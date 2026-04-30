@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Sum, Count
 from datetime import datetime, date, timedelta
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from mainapp.models import (
     ERPUser,
@@ -108,31 +109,25 @@ class ERPUserDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ERPUserCreateView(generics.CreateAPIView):
-    """POST /api/erp-users/new/ — create new user"""
     queryset = ERPUser.objects.all()
     serializer_class = ERPUserCreateSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    permission_classes = [AllowAny] # আগের সেই ৪০১ এরর ঠিক করার জন্য
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        password = serializer.validated_data.pop('password', None)
-        user = ERPUser(**serializer.validated_data)
-        if password:
-            user.password_hash = make_password(password)
-        for field in ['phone', 'address', 'department', 'employee_id']:
-            if getattr(user, field, '') == '':
-                setattr(user, field, None)
-        user.save()
-        return Response(ERPUserSerializer(user).data, status=status.HTTP_201_CREATED)
+    # আলাদা করে create মেথড লেখার দরকার নেই, 
+    # এটি স্বয়ংক্রিয়ভাবে সিরিয়ালাইজারের create() কে কল করবে।
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def erp_user_login(request):
-    """POST /api/erp-users/login/"""
+    """
+    POST /api/erp-users/login/
+    """
     username = request.data.get('username')
     password = request.data.get('password')
+
+    # 1. Validate Input
     if not username or not password:
         return Response(
             {'success': False, 'message': 'Username and password required'},
@@ -140,21 +135,45 @@ def erp_user_login(request):
         )
     
     try:
+        # 2. Find User
         user = ERPUser.objects.get(username=username)
+        
+        # 3. Check Password
         if check_password(password, user.password_hash):
+            if not user.is_active:
+                return Response(
+                    {'success': False, 'message': 'Account is deactivated'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            # 4. Update Last Login (Avoid running full save logic if possible)
             user.last_login = datetime.now()
-            user.save()
-            return Response({'success': True, 'user': ERPUserSerializer(user).data})
+            user.save(update_fields=['last_login'])
+
+            # 5. Generate JWT Tokens
+            refresh = RefreshToken.for_user(user)
+            
+            # 6. Construct Final Response
+            return Response({
+                'success': True,
+                'message': 'Login successful',
+                'tokens': {
+                    'refresh': str(refresh),
+                    'access': str(refresh.access_token),
+                },
+                'user': ERPUserSerializer(user).data
+            }, status=status.HTTP_200_OK)
+
         return Response(
             {'success': False, 'message': 'Invalid password'},
             status=status.HTTP_401_UNAUTHORIZED
         )
+
     except ERPUser.DoesNotExist:
         return Response(
             {'success': False, 'message': 'User not found'},
             status=status.HTTP_404_NOT_FOUND
         )
-
 
 class ERPUserByRoleView(generics.ListAPIView):
     """GET /api/erp-users/role/<role>/"""
