@@ -336,7 +336,6 @@ class ERPBookingListView(generics.ListAPIView):
 
 
 class ERPBookingDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """PUT/PATCH — if down_payment_amount changes, recalculate installments."""
     queryset = ERPBooking.objects.all()
     serializer_class = ERPBookingSerializer
 
@@ -345,25 +344,29 @@ class ERPBookingDetailView(generics.RetrieveUpdateDestroyAPIView):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        
+        # আপডেট সেভ করা
+        booking = serializer.save()
+
+        # যদি ডাউন পেমেন্ট আপডেট হয় তবে কিস্তি পুনরায় হিসাব করা
         if 'down_payment_amount' in request.data:
-            self._recalculate_installments(instance)
-        return Response(self.get_serializer(instance).data)
+            self._recalculate_installments(booking)
+            # রিক্যালকুলেশনের পর ডাটাবেস থেকে লেটেস্ট অবজেক্ট রিফ্রেশ করা
+            booking.refresh_from_db()
+
+        return Response(self.get_serializer(booking).data)
 
     def _recalculate_installments(self, booking):
-        """When a down payment is made, proportionally adjust remaining installments."""
+        # installment_plan যদি related_name হয় তবেই এটি কাজ করবে
         unpaid_installments = booking.installment_plan.filter(is_paid=False)
-        if not unpaid_installments.exists():
-            return
-        remaining_due = booking.total_due
         count = unpaid_installments.count()
+        
         if count > 0:
-            per_installment = remaining_due / count
+            per_installment = booking.total_due / count
             for inst in unpaid_installments:
                 inst.amount = round(per_installment, 2)
                 inst.due_amount = inst.amount - inst.paid_amount
                 inst.save()
-
 
 class ERPBookingCreateView(generics.CreateAPIView):
     queryset = ERPBooking.objects.all()
@@ -372,10 +375,16 @@ class ERPBookingCreateView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        
+        # ডাটাবেসে সেভ করা (মডেলের save() মেথড কল হবে এবং pricing ক্যালকুলেট হবে)
         booking = serializer.save()
+        
+        # প্লটের স্ট্যাটাস আপডেট করা
         if booking.plot:
             booking.plot.status = 'booked'
             booking.plot.save()
+            
+        # রেসপন্স পাঠানোর সময় নতুন ক্যালকুলেটেড ডাটা সহ পাঠানো
         return Response(self.get_serializer(booking).data, status=status.HTTP_201_CREATED)
 
 
@@ -383,24 +392,79 @@ class ERPBookingCreateView(generics.CreateAPIView):
 # 8. INSTALLMENT PLAN VIEWS
 # =====================================================
 
+# class ERPInstallmentPlanListView(generics.ListAPIView):
+#     """GET /api/erp-installments/ — ?booking=<id>"""
+#     serializer_class = ERPInstallmentPlanSerializer
+
+#     def get_queryset(self):
+#         qs = ERPInstallmentPlan.objects.all()
+#         booking_id = self.request.query_params.get('booking')
+#         if booking_id:
+#             qs = qs.filter(booking_id=booking_id)
+#         return qs
+
+
+# class ERPInstallmentPlanDetailView(generics.RetrieveUpdateDestroyAPIView):
+#     queryset = ERPInstallmentPlan.objects.all()
+#     serializer_class = ERPInstallmentPlanSerializer
+
+
+from dateutil.relativedelta import relativedelta
+from decimal import Decimal
+
 class ERPInstallmentPlanListView(generics.ListAPIView):
-    """GET /api/erp-installments/ — ?booking=<id>"""
-    serializer_class = ERPInstallmentPlanSerializer
-
-    def get_queryset(self):
-        qs = ERPInstallmentPlan.objects.all()
-        booking_id = self.request.query_params.get('booking')
-        if booking_id:
-            qs = qs.filter(booking_id=booking_id)
-        return qs
-
-
-class ERPInstallmentPlanDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ERPInstallmentPlan.objects.all()
     serializer_class = ERPInstallmentPlanSerializer
 
+class ERPGenerateInstallmentScheduleView(generics.GenericAPIView):
+    """
+    একসাথে পুরো কিস্তি শিডিউল জেনারেট করার লজিক।
+    Input: booking_id, number_of_installments, start_date
+    """
+    def post(self, request):
+        booking_id = request.data.get('booking_id')
+        num_inst = int(request.data.get('number_of_installments'))
+        start_date_str = request.data.get('start_date')
 
-class ERPInstallmentPlanCreateView(generics.CreateAPIView):
+        try:
+            from .models import ERPBooking # Circular import এড়াতে
+            booking = ERPBooking.objects.get(id=booking_id)
+            
+            # আগের কোনো শিডিউল থাকলে ডিলিট করে নতুন জেনারেট করা নিরাপদ
+            booking.installment_plan.all().delete()
+
+            total_to_distribute = booking.total_due
+            amount_per_inst = round(total_to_distribute / num_inst, 2)
+            current_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            
+            installments = []
+            cumulative_amount = Decimal('0.00')
+
+            for i in range(1, num_inst + 1):
+                # শেষ কিস্তিতে পয়সার গরমিল (Rounding Error) অ্যাডজাস্ট করা
+                if i == num_inst:
+                    inst_amount = total_to_distribute - cumulative_amount
+                else:
+                    inst_amount = amount_per_inst
+                    cumulative_amount += inst_amount
+
+                installments.append(ERPInstallmentPlan(
+                    booking=booking,
+                    installment_number=i,
+                    due_date=current_date,
+                    amount=inst_amount,
+                    due_amount=inst_amount
+                ))
+                # প্রতি কিস্তিতে ১ মাস করে গ্যাপ
+                current_date += relativedelta(months=1)
+
+            ERPInstallmentPlan.objects.bulk_create(installments)
+            return Response({"message": "Installment schedule generated successfully."}, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class ERPInstallmentUpdateView(generics.RetrieveUpdateAPIView):
     queryset = ERPInstallmentPlan.objects.all()
     serializer_class = ERPInstallmentPlanSerializer
 

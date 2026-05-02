@@ -306,11 +306,13 @@ class ERPBookingAdmin(admin.ModelAdmin):
 
 @admin.register(ERPInstallmentPlan)
 class ERPInstallmentPlanAdmin(admin.ModelAdmin):
-    list_display = ('id', 'booking', 'installment_number', 'due_date', 'amount', 'paid_amount', 'due_amount', 'is_paid')
-    list_filter = ('is_paid', 'sms_sent_48h', 'sms_sent_due')
-    search_fields = ('booking__booking_code', 'booking__customer__full_name')
-    ordering = ('booking', 'installment_number')
-    readonly_fields = ('created_at', 'updated_at', 'due_amount')
+    list_display = (
+        'id', 'booking', 'installment_number',
+        'due_date', 'amount', 'paid_amount',
+        'due_amount', 'is_paid',
+        'sms_sent_48h', 'sms_sent_due'
+    )
+    list_filter = ('is_paid',)
 
 
 # =====================================================

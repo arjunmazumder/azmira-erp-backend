@@ -40,8 +40,8 @@ from mainapp.views import (
 
     # 8. Installment Plan
     ERPInstallmentPlanListView,
-    ERPInstallmentPlanDetailView,
-    ERPInstallmentPlanCreateView,
+    ERPInstallmentUpdateView,
+    ERPGenerateInstallmentScheduleView,
 
     # 9. Money Receipt
     ERPMoneyReceiptListView,
@@ -210,9 +210,13 @@ urlpatterns = [
     # 8. INSTALLMENT PLAN
     # ?booking=<id>
     # =====================================================
-    path('erp-installments/', ERPInstallmentPlanListView.as_view(), name='erp-installment-list'),
-    path('erp-installments/<int:pk>/', ERPInstallmentPlanDetailView.as_view(), name='erp-installment-detail'),
-    path('erp-installments/new/', ERPInstallmentPlanCreateView.as_view(), name='erp-installment-create'),
+   # কিস্তির তালিকা দেখার জন্য
+    path('installments/', ERPInstallmentPlanListView.as_view(), name='installment-list'),
+    # অটো শিডিউল জেনারেট করার জন্য (বুকিং আইডিসহ)
+    path('erp-installments/new/', ERPGenerateInstallmentScheduleView.as_view(), name='installment-generate'),
+    # নির্দিষ্ট কিস্তিতে পেমেন্ট বা আপডেট করার জন্য
+    path('installments/<int:pk>/', ERPInstallmentUpdateView.as_view(), name='installment-update'),
+
 
     # =====================================================
     # 9. MONEY RECEIPT

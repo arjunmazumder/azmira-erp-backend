@@ -124,7 +124,7 @@ class ERPLeadSerializer(serializers.ModelSerializer):
 # ===== 7. BOOKING =====
 
 class ERPBookingSerializer(serializers.ModelSerializer):
-    # এই ফিল্ডগুলো ইউজার পাঠাবে না, সিস্টেম জেনারেট করবে
+    # ক্যালকুলেটেড ফিল্ডগুলো read_only রাখা ভালো যাতে ইউজার ইনপুট না দিতে পারে
     final_price = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
     total_paid = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
     total_due = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
@@ -136,36 +136,35 @@ class ERPBookingSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         
-        # নাম দেখানোর লজিক (আপনার আগের কোড অনুযায়ী)
+        # রিলেশনাল ফিল্ডগুলোর নাম দেখানো
         representation['customer'] = instance.customer.full_name if instance.customer else None
         representation['plot'] = instance.plot.plot_number if instance.plot else None
         representation['project'] = instance.project.project_name if instance.project else None
         
+        # Marketing Officer হ্যান্ডেল করা
         if instance.marketing_officer and instance.marketing_officer.user:
             representation['marketing_officer'] = instance.marketing_officer.user.full_name
         else:
             representation['marketing_officer'] = None
 
-        if instance.transferred_to:
-            representation['transferred_to'] = instance.transferred_to.full_name
-        else:
-            representation['transferred_to'] = None
+        # Transfer Information
+        representation['transferred_to'] = instance.transferred_to.full_name if instance.transferred_to else None
             
         return representation
-
 
 # ===== 8. INSTALLMENT PLAN =====
 
 class ERPInstallmentPlanSerializer(serializers.ModelSerializer):
-    booking_code = serializers.ReadOnlyField(source='booking.booking_code')
-    customer_name = serializers.SerializerMethodField()
-
     class Meta:
         model = ERPInstallmentPlan
         fields = '__all__'
 
-    def get_customer_name(self, obj):
-        return obj.booking.customer.full_name if obj.booking else None
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        # রিলেশন থেকে তথ্য দেখানো
+        representation['booking_code'] = instance.booking.booking_code
+        representation['customer_name'] = instance.booking.customer.full_name
+        return representation
 
 
 # ===== 9. MONEY RECEIPT =====

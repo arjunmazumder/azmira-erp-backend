@@ -526,19 +526,31 @@ class ERPBooking(models.Model):
 # 8. INSTALLMENT PLAN
 # =====================================================
 
+from django.db import models
+from decimal import Decimal
+
 class ERPInstallmentPlan(models.Model):
     id = models.BigAutoField(primary_key=True)
-    booking = models.ForeignKey(ERPBooking, on_delete=models.CASCADE, related_name='installment_plan')
+    booking = models.ForeignKey(
+        'ERPBooking',
+        on_delete=models.CASCADE,
+        related_name='installment_plan'
+    )
     installment_number = models.IntegerField()
     due_date = models.DateField()
+
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     paid_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     due_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
     is_paid = models.BooleanField(default=False)
-    paid_date = models.DateField(blank=True, null=True)
-    sms_sent_48h = models.BooleanField(default=False)
-    sms_sent_due = models.BooleanField(default=False)
+
+    # 🔥 Future-ready SMS tracking (recommended)
+    sms_sent_48h_flag = models.BooleanField(default=False)
+    sms_sent_due_flag = models.BooleanField(default=False)
+
     notes = models.TextField(blank=True, null=True, default='')
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -547,14 +559,37 @@ class ERPInstallmentPlan(models.Model):
         unique_together = [['booking', 'installment_number']]
 
     def __str__(self):
-        return f'{self.booking.booking_code} - Installment #{self.installment_number}'
+        return f'Installment #{self.installment_number} for {self.booking.booking_code}'
 
+    # 🔥 Business Logic Methods (Option 2)
+
+    def sms_sent_48h(self):
+        """
+        Due date এর 48 ঘন্টা আগে SMS sent condition
+        """
+        if self.is_paid:
+            return False
+        return self.due_date == date.today() + timedelta(days=2)
+
+    sms_sent_48h.boolean = True
+    sms_sent_48h.short_description = "SMS 48h"
+
+    def sms_sent_due(self):
+        """
+        Due date এ SMS sent condition
+        """
+        if self.is_paid:
+            return False
+        return self.due_date == date.today()
+
+    sms_sent_due.boolean = True
+    sms_sent_due.short_description = "SMS Due"
+
+    # 🔥 Save override (safe calculation)
     def save(self, *args, **kwargs):
-        self.due_amount = self.amount - self.paid_amount
-        if self.paid_amount >= self.amount:
-            self.is_paid = True
+        self.due_amount = (self.amount or 0) - (self.paid_amount or 0)
+        self.is_paid = self.paid_amount >= self.amount
         super().save(*args, **kwargs)
-
 
 # =====================================================
 # 9. MONEY RECEIPT
