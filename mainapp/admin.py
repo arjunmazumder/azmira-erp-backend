@@ -277,7 +277,7 @@ class ERPBookingAdmin(admin.ModelAdmin):
             'fields': ('booking_code', 'customer', 'plot', 'project', 'marketing_officer', 'booking_date', 'status')
         }),
         ('Pricing', {
-            'fields': ('total_price', 'discount_amount', 'discount_note', 'gift_amount', 'gift_note', 'final_price')
+            'fields': ('total_price', 'discount_amount', 'discount_note', 'final_price')
         }),
         ('Token / Booking Money', {
             'fields': ('token_amount', 'token_paid_date', 'token_expiry_date', 'token_status')
