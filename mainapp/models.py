@@ -585,11 +585,20 @@ class ERPInstallmentPlan(models.Model):
     sms_sent_due.boolean = True
     sms_sent_due.short_description = "SMS Due"
 
-    # 🔥 Save override (safe calculation)
+  # 🔥 Save override (Safe calculation & Auto-update Booking)
     def save(self, *args, **kwargs):
+        # ১. কিস্তির নিজস্ব ডিউ এবং পেইড স্ট্যাটাস আপডেট
         self.due_amount = (self.amount or 0) - (self.paid_amount or 0)
         self.is_paid = self.paid_amount >= self.amount
+        
+        # ২. কিস্তিটি আগে সেভ করে নিন (যাতে ডাটাবেসে লেটেস্ট ভ্যালু থাকে)
         super().save(*args, **kwargs)
+
+        # ৩. মেইন বুকিং টেবিল আপডেট করা
+        # এখানে বুকিং মডেলের save() মেথডকে কল করা হচ্ছে যা অটোমেটিক সব কিস্তি যোগ করে
+        # বুকিংয়ের total_paid এবং total_due পুনরায় হিসাব করবে।
+        if self.booking:
+            self.booking.save()
 
 # =====================================================
 # 9. MONEY RECEIPT
