@@ -122,27 +122,30 @@ class ERPLeadSerializer(serializers.ModelSerializer):
 
 
 # ===== 7. BOOKING =====
+
 class ERPBookingSerializer(serializers.ModelSerializer):
+    # এই ফিল্ডগুলো ইউজার পাঠাবে না, সিস্টেম জেনারেট করবে
+    final_price = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
+    total_paid = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
+    total_due = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
+
     class Meta:
         model = ERPBooking
         fields = '__all__'
 
     def to_representation(self, instance):
-        # ডিফল্ট রিপ্রেজেন্টেশন নিয়ে আসা (যেখানে আইডি থাকে)
         representation = super().to_representation(instance)
         
-        # আইডির বদলে নাম দিয়ে রিপ্লেস করা
+        # নাম দেখানোর লজিক (আপনার আগের কোড অনুযায়ী)
         representation['customer'] = instance.customer.full_name if instance.customer else None
         representation['plot'] = instance.plot.plot_number if instance.plot else None
         representation['project'] = instance.project.project_name if instance.project else None
         
-        # Marketing Officer-এর ক্ষেত্রে user-এর full_name রিলেশন থেকে আনতে হবে
         if instance.marketing_officer and instance.marketing_officer.user:
             representation['marketing_officer'] = instance.marketing_officer.user.full_name
         else:
             representation['marketing_officer'] = None
 
-        # Transferred To কাস্টমার মডেলের সাথে রিলেটেড
         if instance.transferred_to:
             representation['transferred_to'] = instance.transferred_to.full_name
         else:

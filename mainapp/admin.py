@@ -266,7 +266,7 @@ class ERPMoneyReceiptInline(admin.TabularInline):
 
 @admin.register(ERPBooking)
 class ERPBookingAdmin(admin.ModelAdmin):
-    list_display = ('id', 'booking_code', 'customer', 'project', 'plot', 'status', 'final_price', 'total_paid', 'total_due', 'token_expiry_date', 'booking_date')
+    list_display = ('id', 'booking_code', 'customer', 'project', 'plot', 'status', 'total_paid', 'total_due', 'token_expiry_date', 'booking_date')
     list_filter = ('status', 'project', 'token_status')
     search_fields = ('booking_code', 'customer__full_name', 'customer__phone', 'plot__plot_number')
     ordering = ('-created_at',)
@@ -277,7 +277,7 @@ class ERPBookingAdmin(admin.ModelAdmin):
             'fields': ('booking_code', 'customer', 'plot', 'project', 'marketing_officer', 'booking_date', 'status')
         }),
         ('Pricing', {
-            'fields': ('total_price', 'discount_amount', 'discount_note', 'final_price')
+            'fields': ('total_price', 'discount_amount', 'discount_note')
         }),
         ('Token / Booking Money', {
             'fields': ('token_amount', 'token_paid_date', 'token_expiry_date', 'token_status')

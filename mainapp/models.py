@@ -500,6 +500,27 @@ class ERPBooking(models.Model):
         self.total_due = self.final_price - self.total_paid
         super().save(*args, **kwargs)
 
+    def save(self, *args, **kwargs):
+        # ১. Final Price ক্যালকুলেশন: total_price - discount_amount
+        # Decimal টাইপ তাই নিশ্চিত করতে হবে এগুলো যেন None না হয়
+        total = self.total_price or 0
+        discount = self.discount_amount or 0
+        self.final_price = total - discount
+
+        # ২. Token এবং Down Payment এর যোগফল হবে total_paid
+        token = self.token_amount or 0
+        dp = self.down_payment_amount or 0
+        self.total_paid = token + dp
+
+        # ৩. Total Due ক্যালকুলেশন: final_price - total_paid
+        self.total_due = self.final_price - self.total_paid
+
+        # ৪. আপনার আগের টোকেন এক্সপায়ারি লজিক
+        if self.token_paid_date and self.token_amount and not self.token_expiry_date:
+            self.token_expiry_date = self.calculate_token_expiry()
+
+        super().save(*args, **kwargs)
+
 
 # =====================================================
 # 8. INSTALLMENT PLAN
