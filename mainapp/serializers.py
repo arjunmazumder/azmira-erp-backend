@@ -126,15 +126,29 @@ class ERPBookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = ERPBooking
         fields = '__all__'
-    # তোউলে (Retrieval) এর সময় ডাটা পরিবর্তন করা
+
     def to_representation(self, instance):
+        # ডিফল্ট রিপ্রেজেন্টেশন নিয়ে আসা (যেখানে আইডি থাকে)
         representation = super().to_representation(instance)
+        
+        # আইডির বদলে নাম দিয়ে রিপ্লেস করা
         representation['customer'] = instance.customer.full_name if instance.customer else None
         representation['plot'] = instance.plot.plot_number if instance.plot else None
         representation['project'] = instance.project.project_name if instance.project else None
-        return representation
-    
+        
+        # Marketing Officer-এর ক্ষেত্রে user-এর full_name রিলেশন থেকে আনতে হবে
+        if instance.marketing_officer and instance.marketing_officer.user:
+            representation['marketing_officer'] = instance.marketing_officer.user.full_name
+        else:
+            representation['marketing_officer'] = None
 
+        # Transferred To কাস্টমার মডেলের সাথে রিলেটেড
+        if instance.transferred_to:
+            representation['transferred_to'] = instance.transferred_to.full_name
+        else:
+            representation['transferred_to'] = None
+            
+        return representation
 
 
 # ===== 8. INSTALLMENT PLAN =====
