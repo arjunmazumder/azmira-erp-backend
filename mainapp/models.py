@@ -428,14 +428,14 @@ class ERPBooking(models.Model):
         null=True, blank=True, related_name='bookings'
     )
     booking_date = models.DateField(default=date.today)
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending') 
 
     # Pricing
     total_price = models.DecimalField(max_digits=16, decimal_places=2)
     discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     discount_note = models.CharField(max_length=200, blank=True, null=True, default='')
-    gift_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    gift_note = models.CharField(max_length=200, blank=True, null=True, default='')
+    # gift_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    # gift_note = models.CharField(max_length=200, blank=True, null=True, default='')
     final_price = models.DecimalField(max_digits=16, decimal_places=2)
 
     # Token — 500=30d, 1000=60d, >1000=90d

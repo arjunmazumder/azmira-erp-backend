@@ -122,23 +122,19 @@ class ERPLeadSerializer(serializers.ModelSerializer):
 
 
 # ===== 7. BOOKING =====
-
 class ERPBookingSerializer(serializers.ModelSerializer):
-    customer_name = serializers.ReadOnlyField(source='customer.full_name')
-    customer_code = serializers.ReadOnlyField(source='customer.customer_code')
-    plot_number = serializers.ReadOnlyField(source='plot.plot_number')
-    project_name = serializers.ReadOnlyField(source='project.project_name')
-    officer_name = serializers.SerializerMethodField()
-    status_display = serializers.SerializerMethodField()
-
     class Meta:
         model = ERPBooking
         fields = '__all__'
+    # তোউলে (Retrieval) এর সময় ডাটা পরিবর্তন করা
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['customer'] = instance.customer.full_name if instance.customer else None
+        representation['plot'] = instance.plot.plot_number if instance.plot else None
+        representation['project'] = instance.project.project_name if instance.project else None
+        return representation
+    
 
-    def get_officer_name(self, obj):
-        return obj.marketing_officer.user.full_name if obj.marketing_officer else None
-
-    def get_status_display(self, obj): return obj.get_status_display()
 
 
 # ===== 8. INSTALLMENT PLAN =====
