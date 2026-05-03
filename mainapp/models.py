@@ -400,6 +400,7 @@ class ERPLead(models.Model):
 # =====================================================
 # 7. BOOKING
 # =====================================================
+from django.db.models import Sum
 
 class ERPBooking(models.Model):
     STATUS_CHOICES = [
@@ -486,36 +487,32 @@ class ERPBooking(models.Model):
         if not self.token_paid_date or not self.token_amount:
             return None
         amount = float(self.token_amount)
-        if amount <= 500:
-            days = 30
-        elif amount <= 1000:
-            days = 60
-        else:
-            days = 90
+        days = 30 if amount <= 500 else 60 if amount <= 1000 else 90
         return self.token_paid_date + timedelta(days=days)
 
     def save(self, *args, **kwargs):
-        if self.token_paid_date and self.token_amount and not self.token_expiry_date:
-            self.token_expiry_date = self.calculate_token_expiry()
-        self.total_due = self.final_price - self.total_paid
-        super().save(*args, **kwargs)
-
-    def save(self, *args, **kwargs):
-        # ১. Final Price ক্যালকুলেশন: total_price - discount_amount
-        # Decimal টাইপ তাই নিশ্চিত করতে হবে এগুলো যেন None না হয়
+        # ১. Final Price ক্যালকুলেশন
         total = self.total_price or 0
         discount = self.discount_amount or 0
         self.final_price = total - discount
 
-        # ২. Token এবং Down Payment এর যোগফল হবে total_paid
+        # ২. Total Paid ক্যালকুলেশন (Token + Down Payment + All Installment Paid Amounts)
         token = self.token_amount or 0
         dp = self.down_payment_amount or 0
-        self.total_paid = token + dp
+        
+        # কিস্তি থেকে আসা পেমেন্ট যোগ করা (এটাই আপনার মিসিং লজিক ছিল)
+        installment_payments = 0
+        if self.pk: # নিশ্চিত হওয়া যে বুকিংটি আগে তৈরি হয়েছে
+            installment_payments = self.installment_plan.aggregate(
+                total=Sum('paid_amount')
+            )['total'] or 0
+        
+        self.total_paid = Decimal(token) + Decimal(dp) + Decimal(installment_payments)
 
-        # ৩. Total Due ক্যালকুলেশন: final_price - total_paid
+        # ৩. Total Due ক্যালকুলেশন
         self.total_due = self.final_price - self.total_paid
 
-        # ৪. আপনার আগের টোকেন এক্সপায়ারি লজিক
+        # ৪. টোকেন এক্সপায়ারি লজিক
         if self.token_paid_date and self.token_amount and not self.token_expiry_date:
             self.token_expiry_date = self.calculate_token_expiry()
 
@@ -591,12 +588,10 @@ class ERPInstallmentPlan(models.Model):
         self.due_amount = (self.amount or 0) - (self.paid_amount or 0)
         self.is_paid = self.paid_amount >= self.amount
         
-        # ২. কিস্তিটি আগে সেভ করে নিন (যাতে ডাটাবেসে লেটেস্ট ভ্যালু থাকে)
+        # ২. কিস্তি সেভ (এটি ডাটাবেসে ডাটা পাঠাবে)
         super().save(*args, **kwargs)
 
-        # ৩. মেইন বুকিং টেবিল আপডেট করা
-        # এখানে বুকিং মডেলের save() মেথডকে কল করা হচ্ছে যা অটোমেটিক সব কিস্তি যোগ করে
-        # বুকিংয়ের total_paid এবং total_due পুনরায় হিসাব করবে।
+        # ৩. মেইন বুকিং আপডেট (বুকিং এর save মেথড কল হবে এবং সব হিসাব নতুন করে হবে)
         if self.booking:
             self.booking.save()
 

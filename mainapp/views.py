@@ -416,36 +416,77 @@ class ERPInstallmentPlanListView(generics.ListAPIView):
     queryset = ERPInstallmentPlan.objects.all()
     serializer_class = ERPInstallmentPlanSerializer
 
+
+class ERPBookingSpecificInstallmentListView(generics.ListAPIView):
+    """
+    নির্দিষ্ট একটি booking_code এর আন্ডারে সব কিস্তির লিস্ট দেখাবে।
+    Example URL: /api/installments/BK-2024-001/
+    """
+    serializer_class = ERPInstallmentPlanSerializer
+
+    def get_queryset(self):
+        # URL থেকে booking_code সংগ্রহ করা হচ্ছে
+        booking_code = self.kwargs['booking_code']
+        # ওই বুকিং কোড অনুযায়ী কিস্তিগুলো ফিল্টার করা
+        return ERPInstallmentPlan.objects.filter(booking__booking_code=booking_code)
+    
+    
+class ERPInstallmentUpdateView(generics.RetrieveUpdateAPIView):
+    queryset = ERPInstallmentPlan.objects.all()
+    serializer_class = ERPInstallmentPlanSerializer
+    
+
+
 class ERPGenerateInstallmentScheduleView(generics.GenericAPIView):
     """
-    একসাথে পুরো কিস্তি শিডিউল জেনারেট করার লজিক।
-    Input: booking_id, number_of_installments, start_date
+    booking_code ব্যবহার করে পুরো কিস্তি শিডিউল জেনারেট করার লজিক।
+    Input: booking_code, number_of_installments, start_date
     """
     def post(self, request):
-        booking_id = request.data.get('booking_id')
-        num_inst = int(request.data.get('number_of_installments'))
+        # এখন আমরা booking_id এর বদলে booking_code নিচ্ছি
+        booking_code = request.data.get('booking_code')
+        num_inst_raw = request.data.get('number_of_installments')
         start_date_str = request.data.get('start_date')
 
+        # বেসিক ভ্যালিডেশন
+        if not all([booking_code, num_inst_raw, start_date_str]):
+            return Response(
+                {"error": "booking_code, number_of_installments and start_date are required."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
-            from .models import ERPBooking # Circular import এড়াতে
-            booking = ERPBooking.objects.get(id=booking_id)
+            from .models import ERPBooking, ERPInstallmentPlan
+            num_inst = int(num_inst_raw)
             
-            # আগের কোনো শিডিউল থাকলে ডিলিট করে নতুন জেনারেট করা নিরাপদ
+            # booking_code দিয়ে অবজেক্টটি খুঁজে বের করা
+            try:
+                booking = ERPBooking.objects.get(booking_code=booking_code)
+            except ERPBooking.DoesNotExist:
+                return Response({"error": f"Booking with code {booking_code} not found."}, status=status.HTTP_404_NOT_FOUND)
+            
+            # ১. আগের কোনো শিডিউল থাকলে ডিলিট করা
             booking.installment_plan.all().delete()
 
+            # ২. ক্যালকুলেশন শুরু
             total_to_distribute = booking.total_due
+            
+            if total_to_distribute <= 0:
+                return Response({"error": "Total due is 0. No installments needed."}, status=status.HTTP_400_BAD_REQUEST)
+
             amount_per_inst = round(total_to_distribute / num_inst, 2)
             current_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
             
             installments = []
             cumulative_amount = Decimal('0.00')
 
+            # ৩. লুপ চালিয়ে কিস্তি তৈরি
             for i in range(1, num_inst + 1):
-                # শেষ কিস্তিতে পয়সার গরমিল (Rounding Error) অ্যাডজাস্ট করা
                 if i == num_inst:
+                    # শেষ কিস্তিতে পয়সার রাউন্ডিং অ্যাডজাস্ট করা
                     inst_amount = total_to_distribute - cumulative_amount
                 else:
-                    inst_amount = amount_per_inst
+                    inst_amount = Decimal(str(amount_per_inst))
                     cumulative_amount += inst_amount
 
                 installments.append(ERPInstallmentPlan(
@@ -455,18 +496,22 @@ class ERPGenerateInstallmentScheduleView(generics.GenericAPIView):
                     amount=inst_amount,
                     due_amount=inst_amount
                 ))
-                # প্রতি কিস্তিতে ১ মাস করে গ্যাপ
+                # প্রতি কিস্তিতে ১ মাস বৃদ্ধি
                 current_date += relativedelta(months=1)
 
+            # ৪. Bulk Create ব্যবহার করে একবারে সেভ করা
             ERPInstallmentPlan.objects.bulk_create(installments)
-            return Response({"message": "Installment schedule generated successfully."}, status=status.HTTP_201_CREATED)
+            
+            return Response(
+                {"message": f"Successfully generated {num_inst} installments for booking {booking_code}."}, 
+                status=status.HTTP_201_CREATED
+            )
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
 
-class ERPInstallmentUpdateView(generics.RetrieveUpdateAPIView):
-    queryset = ERPInstallmentPlan.objects.all()
-    serializer_class = ERPInstallmentPlanSerializer
+
 
 
 # =====================================================
