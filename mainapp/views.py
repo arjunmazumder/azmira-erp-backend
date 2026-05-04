@@ -980,36 +980,71 @@ class ERPDividendDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 
+from decimal import Decimal
+from django.db import transaction
+from django.utils import timezone
+
 class ERPDividendCreateView(generics.CreateAPIView):
     queryset = ERPDividend.objects.all()
     serializer_class = ERPDividendSerializer
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        with transaction.atomic():
-            dividend = serializer.save()
-            
-            # select_for_update ব্যবহার করলে ওয়ালেটে একই সময়ে অন্য কোনো ট্রানজ্যাকশন বাধা দিতে পারবে না
-            wallet = ERPWallet.objects.select_for_update().filter(
-                user=dividend.investor.user,
-                wallet_type='investor'
-            ).first()
-            
-            if wallet:
-                wallet.balance += dividend.dividend_amount
-                wallet.save()
-                
-                dividend.wallet_credited = True
-                dividend.wallet_credited_at = datetime.now()
-                dividend.save()
-            else:
-                # যদি ওয়ালেট না থাকে তবে এরর রিটার্ন করা ভালো
-                return Response({"error": "Investor wallet not found"}, status=status.HTTP_400_BAD_REQUEST)
-                
-        return Response(self.get_serializer(dividend).data, status=status.HTTP_201_CREATED)
+        investment_id = request.data.get('investment')
+        month = request.data.get('month')
+        year = request.data.get('year')
 
+        if not all([investment_id, month, year]):
+            return Response({"error": "investment, month, and year are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # ইনভেস্টমেন্ট ডাটা খুঁজে বের করা
+            investment = ERPInvestment.objects.get(id=investment_id)
+            
+            # অটোমেটিক ক্যালকুলেশন
+            base_amount = investment.invest_amount
+            dividend_rate = investment.monthly_dividend_rate
+            # লভ্যাংশ হিসাব: (টাকা * রেট) / ১০০
+            dividend_amount = (base_amount * dividend_rate) / Decimal('100.00')
+
+            with transaction.atomic():
+                # ১. ডিভিডেন্ড তৈরি (অটোমেটেড ডাটা সহ)
+                dividend = ERPDividend.objects.create(
+                    investment=investment,
+                    investor=investment.investor, # অটোমেটিক ইনভেস্টর সেট
+                    month=month,
+                    year=year,
+                    base_amount=base_amount,
+                    dividend_rate=dividend_rate,
+                    dividend_amount=dividend_amount,
+                    status='paid' # টাকা যেহেতু সাথে সাথে দিচ্ছি, তাই 'paid' সেট করা ভালো
+                )
+
+                # ২. ইনভেস্টরের ওয়ালেট আপডেট
+                wallet = ERPWallet.objects.select_for_update().filter(
+                    user=investment.investor.user,
+                    wallet_type='investor'
+                ).first()
+
+                if wallet:
+                    wallet.balance += dividend_amount
+                    wallet.save()
+                    
+                    dividend.wallet_credited = True
+                    dividend.wallet_credited_at = timezone.now()
+                    dividend.save()
+                else:
+                    raise Exception("Investor wallet not found")
+
+                # ৩. ইনভেস্টমেন্ট মডেলে টোটাল প্রফিট আপডেট
+                investment.total_profit_received += dividend_amount
+                investment.save()
+
+            return Response(self.get_serializer(dividend).data, status=status.HTTP_201_CREATED)
+
+        except ERPInvestment.DoesNotExist:
+            return Response({"error": "Investment not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 # =====================================================
 # 17. HR VIEWS
