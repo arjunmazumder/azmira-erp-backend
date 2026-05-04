@@ -983,7 +983,7 @@ class ERPInvestment(models.Model):
 
     id = models.BigAutoField(primary_key=True)
     investor = models.ForeignKey(ERPInvestor, on_delete=models.CASCADE, related_name='investments')
-    # project = models.ForeignKey(ERPProject, on_delete=models.SET_NULL, null=True, blank=True, related_name='investments')
+    project = models.ForeignKey(ERPProject, on_delete=models.SET_NULL, null=True, blank=True, related_name='investments')
     invest_amount = models.DecimalField(max_digits=16, decimal_places=2)
     invest_date = models.DateField(default=date.today)
     maturity_date = models.DateField(blank=True, null=True)
