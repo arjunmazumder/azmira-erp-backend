@@ -10,6 +10,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Sum, Count
 from datetime import datetime, date, timedelta
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.db import transaction
 
 from mainapp.models import (
     ERPUser,
@@ -917,7 +918,7 @@ class ERPLoanCreateView(generics.CreateAPIView):
 # =====================================================
 
 class ERPInvestorListView(generics.ListAPIView):
-    queryset = ERPInvestor.objects.filter(is_active=True)
+    queryset = ERPInvestor.objects.filter()
     serializer_class = ERPInvestorSerializer
 
 
@@ -977,25 +978,36 @@ class ERPDividendDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ERPDividendSerializer
 
 
+
+
 class ERPDividendCreateView(generics.CreateAPIView):
-    """Monthly dividend auto-generated and credited to investor wallet."""
     queryset = ERPDividend.objects.all()
     serializer_class = ERPDividendSerializer
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        dividend = serializer.save()
-        investor_wallet = ERPWallet.objects.filter(
-            user=dividend.investor.user,
-            wallet_type='investor'
-        ).first()
-        if investor_wallet:
-            investor_wallet.balance += dividend.dividend_amount
-            investor_wallet.save()
-            dividend.wallet_credited = True
-            dividend.wallet_credited_at = datetime.now()
-            dividend.save()
+        
+        with transaction.atomic():
+            dividend = serializer.save()
+            
+            # select_for_update ব্যবহার করলে ওয়ালেটে একই সময়ে অন্য কোনো ট্রানজ্যাকশন বাধা দিতে পারবে না
+            wallet = ERPWallet.objects.select_for_update().filter(
+                user=dividend.investor.user,
+                wallet_type='investor'
+            ).first()
+            
+            if wallet:
+                wallet.balance += dividend.dividend_amount
+                wallet.save()
+                
+                dividend.wallet_credited = True
+                dividend.wallet_credited_at = datetime.now()
+                dividend.save()
+            else:
+                # যদি ওয়ালেট না থাকে তবে এরর রিটার্ন করা ভালো
+                return Response({"error": "Investor wallet not found"}, status=status.HTTP_400_BAD_REQUEST)
+                
         return Response(self.get_serializer(dividend).data, status=status.HTTP_201_CREATED)
 
 

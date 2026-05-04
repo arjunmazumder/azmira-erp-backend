@@ -4,6 +4,8 @@ from django.core.files.base import ContentFile
 from PIL import Image
 from django.db import models
 from datetime import date, timedelta
+from django.db import models
+from decimal import Decimal
 
 
 # =====================================================
@@ -523,9 +525,6 @@ class ERPBooking(models.Model):
 # 8. INSTALLMENT PLAN
 # =====================================================
 
-from django.db import models
-from decimal import Decimal
-
 class ERPInstallmentPlan(models.Model):
     id = models.BigAutoField(primary_key=True)
     booking = models.ForeignKey(
@@ -594,6 +593,8 @@ class ERPInstallmentPlan(models.Model):
         # ৩. মেইন বুকিং আপডেট (বুকিং এর save মেথড কল হবে এবং সব হিসাব নতুন করে হবে)
         if self.booking:
             self.booking.save()
+
+
 
 # =====================================================
 # 9. MONEY RECEIPT
@@ -957,6 +958,10 @@ class ERPInvestor(models.Model):
     id = models.BigAutoField(primary_key=True)
     user = models.OneToOneField(ERPUser, on_delete=models.CASCADE, related_name='investor_profile')
     investor_code = models.CharField(max_length=50, unique=True)
+    marketing_officer = models.ForeignKey(
+        'ERPMarketingOfficer', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='bookings'
+    )
     bank_name = models.CharField(max_length=100, blank=True, null=True, default='')
     bank_account = models.CharField(max_length=50, blank=True, null=True, default='')
     bank_branch = models.CharField(max_length=100, blank=True, null=True, default='')
@@ -978,7 +983,7 @@ class ERPInvestment(models.Model):
 
     id = models.BigAutoField(primary_key=True)
     investor = models.ForeignKey(ERPInvestor, on_delete=models.CASCADE, related_name='investments')
-    project = models.ForeignKey(ERPProject, on_delete=models.SET_NULL, null=True, blank=True, related_name='investments')
+    # project = models.ForeignKey(ERPProject, on_delete=models.SET_NULL, null=True, blank=True, related_name='investments')
     invest_amount = models.DecimalField(max_digits=16, decimal_places=2)
     invest_date = models.DateField(default=date.today)
     maturity_date = models.DateField(blank=True, null=True)
