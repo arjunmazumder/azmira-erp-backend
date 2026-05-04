@@ -959,8 +959,11 @@ class ERPInvestor(models.Model):
     user = models.OneToOneField(ERPUser, on_delete=models.CASCADE, related_name='investor_profile')
     investor_code = models.CharField(max_length=50, unique=True)
     marketing_officer = models.ForeignKey(
-        'ERPMarketingOfficer', on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='bookings'
+    'ERPMarketingOfficer',
+    on_delete=models.SET_NULL,
+    null=True,
+    blank=True,
+    related_name='investors'   # ✅ CHANGE THIS
     )
     bank_name = models.CharField(max_length=100, blank=True, null=True, default='')
     bank_account = models.CharField(max_length=50, blank=True, null=True, default='')
