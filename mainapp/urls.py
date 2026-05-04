@@ -48,6 +48,7 @@ from mainapp.views import (
     ERPMoneyReceiptListView,
     ERPMoneyReceiptDetailView,
     ERPMoneyReceiptCreateView,
+    ERPMoneyReceiptDownloadView,
 
     # 10. Voucher
     ERPVoucherListView,
@@ -228,6 +229,7 @@ urlpatterns = [
     path('erp-receipts/', ERPMoneyReceiptListView.as_view(), name='erp-receipt-list'),
     path('erp-receipts/<int:pk>/', ERPMoneyReceiptDetailView.as_view(), name='erp-receipt-detail'),
     path('erp-receipts/new/', ERPMoneyReceiptCreateView.as_view(), name='erp-receipt-create'),
+    path('receipts/download-pdf/<int:pk>/', ERPMoneyReceiptDownloadView.as_view(), name='receipt-download-pdf'),
 
     # =====================================================
     # 10. VOUCHER

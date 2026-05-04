@@ -1,11 +1,17 @@
 from pathlib import Path
 from datetime import timedelta
+import os
+
+# GTK ইনস্টল করার পর যদি এই পাথে থাকে (সাধারণত এখানে থাকে)
+GTK_PATH = r'C:\Program Files\GTK3-Runtime Win64\bin'
+os.environ['PATH'] = GTK_PATH + os.pathsep + os.environ.get('PATH', '')
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-ol$9)r6^fs$k)^2al^^ru9i*(ufe)fxfre^izt8-ytlhx$90o9'
 
 DEBUG = True
+AUTH_USER_MODEL = 'users.User'
 
 ALLOWED_HOSTS = ['*']
 
@@ -20,7 +26,10 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     'rest_framework.authtoken',
     'corsheaders',
+    'django_filters',
     'mainapp',
+    'users',
+    'core'
 ]
 
 MIDDLEWARE = [
@@ -101,6 +110,9 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend'
+    ]
     # "DEFAULT_PERMISSION_CLASSES": (
     #     "rest_framework.permissions.IsAuthenticated",
     # ),

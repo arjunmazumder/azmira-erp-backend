@@ -517,6 +517,12 @@ class ERPGenerateInstallmentScheduleView(generics.GenericAPIView):
 # =====================================================
 # 9. MONEY RECEIPT VIEWS
 # =====================================================
+from django.template.loader import render_to_string
+from weasyprint import HTML
+from django.http import HttpResponse
+from datetime import datetime
+from rest_framework import generics, status
+from rest_framework.response import Response
 
 class ERPMoneyReceiptListView(generics.ListAPIView):
     """GET /api/erp-receipts/ — ?booking=<id>&customer=<id>&status=<status>"""
@@ -575,8 +581,8 @@ class ERPMoneyReceiptDetailView(generics.RetrieveUpdateDestroyAPIView):
             inst.save()
 
 
+
 class ERPMoneyReceiptCreateView(generics.CreateAPIView):
-    """Customer can also create (created_by_customer=True). Cash payment triggers commission."""
     queryset = ERPMoneyReceipt.objects.all()
     serializer_class = ERPMoneyReceiptSerializer
 
@@ -584,12 +590,19 @@ class ERPMoneyReceiptCreateView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         receipt = serializer.save()
+
+        # কমিশন ট্রিগার লজিক
         if receipt.payment_mode == 'cash' and receipt.status == 'authorized':
             self._trigger_commission(receipt)
-        return Response(self.get_serializer(receipt).data, status=status.HTTP_201_CREATED)
+
+        # রেসপন্স ডাটা তৈরি
+        data = self.get_serializer(receipt).data
+        
+        # যদি সাথে সাথে PDF ডাউনলোড করতে চান, তবে আলাদা URL ব্যবহার করা ভালো। 
+        # তবে ক্রিয়েট করার সময় শুধু ডাটা রিটার্ন করাই স্ট্যান্ডার্ড।
+        return Response(data, status=status.HTTP_201_CREATED)
 
     def _trigger_commission(self, receipt):
-        """Cash payment → immediately credit wallet. Cheque/bank → after clearing."""
         booking = receipt.booking
         if booking and booking.marketing_officer:
             pending_commissions = ERPCommission.objects.filter(
@@ -602,6 +615,7 @@ class ERPMoneyReceiptCreateView(generics.CreateAPIView):
                 commission.wallet_hit_at = datetime.now()
                 commission.status = 'paid'
                 commission.save()
+                
                 wallet = ERPWallet.objects.filter(
                     user=commission.marketing_officer.user
                 ).first()
@@ -609,7 +623,29 @@ class ERPMoneyReceiptCreateView(generics.CreateAPIView):
                     wallet.balance += commission.commission_amount
                     wallet.save()
 
+# PDF জেনারেশনের জন্য আলাদা একটি View রাখা ভালো
+class ERPMoneyReceiptDownloadView(generics.RetrieveAPIView):
+    queryset = ERPMoneyReceipt.objects.all()
 
+    def get(self, request, *args, **kwargs):
+        receipt_obj = self.get_object()
+        
+        # Amount in Words ডাইনামিক করার জন্য num2words লাইব্রেরি ব্যবহার করতে পারেন
+        # অথবা আপনার ম্যানুয়াল ফরম্যাট
+        amount_in_words = f"BDT: {receipt_obj.amount} Taka Only." 
+
+        context = {
+            'receipt': receipt_obj,
+            'amount_in_words': amount_in_words,
+            'generated_at': datetime.now().strftime("%d-%m-%Y %H:%M %p"),
+        }
+
+        html_string = render_to_string('pdf/money_receipt.html', context)
+        pdf = HTML(string=html_string).write_pdf()
+
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="Receipt_{receipt_obj.receipt_number}.pdf"'
+        return response
 # =====================================================
 # 10. VOUCHER VIEWS
 # =====================================================
