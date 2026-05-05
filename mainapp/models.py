@@ -18,6 +18,7 @@ from decimal import Decimal
 # =====================================================
 
 class ERPUser(models.Model):
+    # রোল এবং ডিপার্টমেন্টের চয়েসগুলো (রেফারেন্সের জন্য)
     ROLE_CHOICES = [
         ('super_admin', 'Super Admin'),
         ('admin', 'Admin'),
@@ -49,7 +50,10 @@ class ERPUser(models.Model):
     nid = models.CharField(max_length=50, blank=True, null=True, default='')
     date_of_birth = models.DateField(blank=True, null=True)
     image = models.ImageField(upload_to='erp/users/', blank=True, null=True, default='')
-    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default='customer')
+    
+    # মাল্টিপল রোল রাখার জন্য JSONField
+    roles = models.JSONField(default=list, blank=True) 
+    
     department = models.CharField(max_length=50, choices=DEPARTMENT_CHOICES, blank=True, null=True, default='')
     employee_id = models.CharField(max_length=50, blank=True, null=True, default='')
     is_customer = models.BooleanField(default=False)
@@ -65,9 +69,10 @@ class ERPUser(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'{self.username} - {self.get_role_display()}'
+        return f'{self.username} - {", ".join(self.roles)}'
 
     def save(self, *args, **kwargs):
+        # ইমেজ কনভারশন লজিক (আগের মতোই)
         if self.image and hasattr(self.image, 'file'):
             try:
                 img = Image.open(self.image)
@@ -80,7 +85,6 @@ class ERPUser(models.Model):
             except Exception as e:
                 print('Image conversion failed:', e)
         super().save(*args, **kwargs)
-
 
 # =====================================================
 # 2. PROJECT
@@ -953,6 +957,9 @@ class ERPLoan(models.Model):
 # =====================================================
 # 16. INVESTOR
 # =====================================================
+from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 class ERPInvestor(models.Model):
     id = models.BigAutoField(primary_key=True)
@@ -974,6 +981,16 @@ class ERPInvestor(models.Model):
 
     def __str__(self):
         return f'{self.investor_code} - {self.user.full_name}'
+    
+@receiver(post_save, sender=ERPInvestor)
+def create_investor_wallet(sender, instance, created, **kwargs):
+    if created:
+        from .models import ERPWallet # Circular import এড়াতে ভেতরে ইমপোর্ট করা ভালো
+        ERPWallet.objects.get_or_create(
+            user=instance.user,
+            wallet_type='investor',
+            defaults={'balance': 0}
+        )
 
 
 class ERPInvestment(models.Model):

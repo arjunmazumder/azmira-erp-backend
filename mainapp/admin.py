@@ -39,8 +39,8 @@ from mainapp.models import (
 
 @admin.register(ERPUser)
 class ERPUserAdmin(admin.ModelAdmin):
-    list_display = ('id', 'username', 'full_name', 'email', 'role', 'department', 'is_active', 'created_at')
-    list_filter = ('role', 'department', 'is_active', 'is_customer', 'is_investor', 'is_marketing')
+    list_display = ('id', 'username', 'full_name', 'email', 'roles', 'department', 'is_active', 'created_at')
+    list_filter = ('roles', 'department', 'is_active', 'is_customer', 'is_investor', 'is_marketing')
     search_fields = ('username', 'full_name', 'email', 'phone', 'nid', 'employee_id')
     ordering = ('-created_at',)
     readonly_fields = ('created_at', 'updated_at', 'last_login')
@@ -52,7 +52,7 @@ class ERPUserAdmin(admin.ModelAdmin):
             'fields': ('full_name', 'phone', 'address', 'nid', 'date_of_birth', 'image')
         }),
         ('Role & Department', {
-            'fields': ('role', 'department', 'employee_id')
+            'fields': ('roles', 'department', 'employee_id')
         }),
         ('Flags', {
             'fields': ('is_customer', 'is_investor', 'is_marketing', 'is_active')

@@ -31,25 +31,41 @@ class ERPUserListSerializer(serializers.ModelSerializer):
         model = ERPUser
         fields = ['id', 'username', 'full_name', 'email', 'role', 'department', 'is_active']
 
+
+
 class ERPUserCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
-    # এখানে ডিফল্ট ভ্যালু সেট করে দিন
-    is_active = serializers.BooleanField(default=True) 
+    is_active = serializers.BooleanField(default=True)
+    
+    # ফ্রন্টএন্ড থেকে ["admin", "investor"] এমন লিস্ট ইনপুট নিবে
+    roles = serializers.ListField(
+        child=serializers.CharField(), 
+        required=False, 
+        default=list
+    )
 
     class Meta:
         model = ERPUser
-        fields = ['id', 'username', 'email', 'password', 'full_name', 'phone', 'address',
-                  'nid', 'date_of_birth', 'image', 'role', 'department', 'employee_id',
-                  'is_customer', 'is_investor', 'is_marketing', 'is_active']
+        fields = [
+            'id', 'username', 'email', 'password', 'full_name', 'phone', 
+            'address', 'nid', 'date_of_birth', 'image', 'roles', 
+            'department', 'employee_id', 'is_customer', 'is_investor', 
+            'is_marketing', 'is_active'
+        ]
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
-        # এখানে validated_data-তে is_active না থাকলেও ডিফল্ট True পাবে
+        
+        # পাসওয়ার্ড বাদে বাকি সব ডাটা (roles সহ) দিয়ে ইউজার তৈরি
         user = ERPUser.objects.create(**validated_data) 
+        
         if password:
             user.password_hash = make_password(password)
             user.save()
+            
         return user
+
+
 # ===== 2. PROJECT =====
 
 class ERPProjectSerializer(serializers.ModelSerializer):
