@@ -874,7 +874,9 @@ class ERPWalletTransaction(models.Model):
 
 
 # =====================================================
+
 # 14. COMMISSION
+
 # =====================================================
 
 class ERPCommissionRule(models.Model):
