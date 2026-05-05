@@ -4,8 +4,11 @@ from django.core.files.base import ContentFile
 from PIL import Image
 from django.db import models
 from datetime import date, timedelta
-from django.db import models
 from decimal import Decimal
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.db.models import Sum
+
 
 
 # =====================================================
@@ -14,7 +17,7 @@ from decimal import Decimal
 
 
 # =====================================================
-# 1. USER & AUTHENTICATION
+# 1. USER & AUTHENTICATION (DONE)
 # =====================================================
 
 class ERPUser(models.Model):
@@ -87,7 +90,7 @@ class ERPUser(models.Model):
         super().save(*args, **kwargs)
 
 # =====================================================
-# 2. PROJECT
+# 2. PROJECT (DONE)
 # =====================================================
 
 class ERPProject(models.Model):
@@ -154,7 +157,7 @@ class ERPProject(models.Model):
 
 
 # =====================================================
-# 3. PLOT / FLAT / LOT
+# 3. PLOT / FLAT / LOT (DONE)
 # =====================================================
 
 class ERPPlot(models.Model):
@@ -217,7 +220,7 @@ class ERPPlot(models.Model):
 
 
 # =====================================================
-# 4. LAND RECORD
+# 4. LAND RECORD 
 # =====================================================
 
 class ERPLandRecord(models.Model):
@@ -263,7 +266,7 @@ class ERPLandRecord(models.Model):
 
 
 # =====================================================
-# 5. CUSTOMER
+# 5. CUSTOMER (DONE)
 # =====================================================
 
 class ERPCustomer(models.Model):
@@ -337,7 +340,7 @@ class ERPCustomer(models.Model):
 
 
 # =====================================================
-# 6. LEAD MANAGEMENT
+# 6. LEAD MANAGEMENT 
 # =====================================================
 
 class ERPLead(models.Model):
@@ -404,9 +407,8 @@ class ERPLead(models.Model):
 
 
 # =====================================================
-# 7. BOOKING
+# 7. BOOKING (DONE)
 # =====================================================
-from django.db.models import Sum
 
 class ERPBooking(models.Model):
     STATUS_CHOICES = [
@@ -526,7 +528,7 @@ class ERPBooking(models.Model):
 
 
 # =====================================================
-# 8. INSTALLMENT PLAN
+# 8. INSTALLMENT PLAN (DONE)
 # =====================================================
 
 class ERPInstallmentPlan(models.Model):
@@ -599,9 +601,8 @@ class ERPInstallmentPlan(models.Model):
             self.booking.save()
 
 
-
 # =====================================================
-# 9. MONEY RECEIPT
+# 9. MONEY RECEIPT (DONE)
 # =====================================================
 
 class ERPMoneyReceipt(models.Model):
@@ -955,11 +956,8 @@ class ERPLoan(models.Model):
 
 
 # =====================================================
-# 16. INVESTOR
+# 16. INVESTOR (DONE)
 # =====================================================
-from django.db import models
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 
 class ERPInvestor(models.Model):
     id = models.BigAutoField(primary_key=True)

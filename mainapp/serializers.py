@@ -14,6 +14,7 @@ from mainapp.models import (
 # ===== 1. USER =====
 
 class ERPUserSerializer(serializers.ModelSerializer):
+    # roles এখন লিস্ট, তাই আমরা ম্যানুয়ালি এটি ডিসপ্লে করার জন্য মেথড লিখব
     role_display = serializers.SerializerMethodField()
     department_display = serializers.SerializerMethodField()
 
@@ -22,22 +23,37 @@ class ERPUserSerializer(serializers.ModelSerializer):
         fields = '__all__'
         extra_kwargs = {'password_hash': {'write_only': True}}
 
-    def get_role_display(self, obj): return obj.get_role_display()
-    def get_department_display(self, obj): return obj.get_department_display() if obj.department else None
+    def get_role_display(self, obj):
+        # JSONField/List এর জন্য কাস্টম ডিসপ্লে লজিক
+        if obj.roles:
+            # আন্ডারস্কোর বাদ দিয়ে এবং টাইটেল কেস করে দেখাবে (যেমন: admin -> Admin)
+            return ", ".join([r.replace('_', ' ').title() for r in obj.roles])
+        return "No Role"
+
+    def get_department_display(self, obj):
+        # Department এখনো ChoiceField তাই এটি কাজ করবে
+        return obj.get_department_display() if obj.department else None
 
 
 class ERPUserListSerializer(serializers.ModelSerializer):
+    # লিস্ট ভিউতে 'role' এর বদলে 'roles' ব্যবহার করতে হবে
+    role_display = serializers.SerializerMethodField()
+
     class Meta:
         model = ERPUser
-        fields = ['id', 'username', 'full_name', 'email', 'role', 'department', 'is_active']
+        fields = ['id', 'username', 'full_name', 'email', 'roles', 'role_display', 'department', 'is_active']
 
+    def get_role_display(self, obj):
+        if obj.roles:
+            return ", ".join([r.replace('_', ' ').title() for r in obj.roles])
+        return "N/A"
 
 
 class ERPUserCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
     is_active = serializers.BooleanField(default=True)
     
-    # ফ্রন্টএন্ড থেকে ["admin", "investor"] এমন লিস্ট ইনপুট নিবে
+    # ইনপুট হিসেবে লিস্ট নিবে
     roles = serializers.ListField(
         child=serializers.CharField(), 
         required=False, 
@@ -55,8 +71,6 @@ class ERPUserCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
-        
-        # পাসওয়ার্ড বাদে বাকি সব ডাটা (roles সহ) দিয়ে ইউজার তৈরি
         user = ERPUser.objects.create(**validated_data) 
         
         if password:
@@ -64,7 +78,6 @@ class ERPUserCreateSerializer(serializers.ModelSerializer):
             user.save()
             
         return user
-
 
 # ===== 2. PROJECT =====
 
