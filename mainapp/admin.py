@@ -481,39 +481,91 @@ class ERPWalletTransactionAdmin(admin.ModelAdmin):
 # 14. COMMISSION
 # =====================================================
 
+# @admin.register(ERPCommissionRule)
+# class ERPCommissionRuleAdmin(admin.ModelAdmin):
+#     list_display = ('id', 'rule_name', 'project', 'generation', 'percentage', 'is_active', 'effective_from', 'effective_to')
+#     list_filter = ('is_active', 'project', 'generation')
+#     search_fields = ('rule_name',)
+#     ordering = ('generation',)
+#     readonly_fields = ('created_at',)
+
+
+# @admin.register(ERPCommission)
+# class ERPCommissionAdmin(admin.ModelAdmin):
+#     list_display = ('id', 'marketing_officer', 'booking', 'generation', 'commission_rate', 'commission_amount', 'is_cash_payment', 'status', 'wallet_hit')
+#     list_filter = ('status', 'generation', 'is_cash_payment', 'wallet_hit')
+#     search_fields = ('marketing_officer__officer_code', 'marketing_officer__user__full_name', 'booking__booking_code')
+#     ordering = ('-created_at',)
+#     readonly_fields = ('created_at', 'updated_at', 'wallet_hit_at')
+#     fieldsets = (
+#         ('Commission Info', {
+#             'fields': ('marketing_officer', 'booking', 'receipt', 'generation')
+#         }),
+#         ('Amount', {
+#             'fields': ('commission_rate', 'base_amount', 'commission_amount', 'payment_mode', 'is_cash_payment')
+#         }),
+#         ('Status', {
+#             'fields': ('status', 'wallet_hit', 'wallet_hit_at')
+#         }),
+#         ('Audit', {
+#             'fields': ('created_at', 'updated_at'),
+#             'classes': ('collapse',)
+#         }),
+#     )
+
+from django.contrib import admin
+from .models import ERPCommission, ERPCommissionRule
+
 @admin.register(ERPCommissionRule)
 class ERPCommissionRuleAdmin(admin.ModelAdmin):
-    list_display = ('id', 'rule_name', 'project', 'generation', 'percentage', 'is_active', 'effective_from', 'effective_to')
-    list_filter = ('is_active', 'project', 'generation')
-    search_fields = ('rule_name',)
-    ordering = ('generation',)
-    readonly_fields = ('created_at',)
+    list_display = (
+        'id',
+        'project',
+        'source_type',
+        'generation',
+        'percentage',
+        'is_active'
+    )
+
+    list_filter = (
+        'project',
+        'source_type',
+        'is_active'
+    )
+
+    search_fields = (
+        'project__project_name',
+    )
 
 
 @admin.register(ERPCommission)
 class ERPCommissionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'marketing_officer', 'booking', 'generation', 'commission_rate', 'commission_amount', 'is_cash_payment', 'status', 'wallet_hit')
-    list_filter = ('status', 'generation', 'is_cash_payment', 'wallet_hit')
-    search_fields = ('marketing_officer__officer_code', 'marketing_officer__user__full_name', 'booking__booking_code')
-    ordering = ('-created_at',)
-    readonly_fields = ('created_at', 'updated_at', 'wallet_hit_at')
-    fieldsets = (
-        ('Commission Info', {
-            'fields': ('marketing_officer', 'booking', 'receipt', 'generation')
-        }),
-        ('Amount', {
-            'fields': ('commission_rate', 'base_amount', 'commission_amount', 'payment_mode', 'is_cash_payment')
-        }),
-        ('Status', {
-            'fields': ('status', 'wallet_hit', 'wallet_hit_at')
-        }),
-        ('Audit', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
+    list_display = (
+        'id',
+        'marketing_officer',
+        'booking',
+        'source_type',
+        'generation',
+        'commission_amount',
+        'status',
+        'wallet_hit',
+        'created_at'
     )
 
+    list_filter = (
+        'status',
+        'source_type',
+        'wallet_hit'
+    )
 
+    search_fields = (
+        'marketing_officer__user__full_name',
+        'booking__booking_code'
+    )
+
+    readonly_fields = (
+        'created_at',
+    )
 # =====================================================
 # 15. LOAN
 # =====================================================

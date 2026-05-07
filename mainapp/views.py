@@ -7,10 +7,12 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from django.db.models import Sum, Count
+from rest_framework.views import APIView
+from django.db.models import Sum, Count, Q
 from datetime import datetime, date, timedelta
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db import transaction
+from decimal import Decimal
 
 from mainapp.models import (
     ERPUser,
@@ -112,34 +114,26 @@ class ERPUserDetailView(generics.RetrieveUpdateDestroyAPIView):
 class ERPUserCreateView(generics.CreateAPIView):
     queryset = ERPUser.objects.all()
     serializer_class = ERPUserCreateSerializer
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
-    permission_classes = [AllowAny] # আগের সেই ৪০১ এরর ঠিক করার জন্য
-
-    # আলাদা করে create মেথড লেখার দরকার নেই, 
-    # এটি স্বয়ংক্রিয়ভাবে সিরিয়ালাইজারের create() কে কল করবে।
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
+    permission_classes = [AllowAny]
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def erp_user_login(request):
-    """
-    POST /api/erp-users/login/
-    """
+    """POST /api/erp-users/login/"""
     username = request.data.get('username')
     password = request.data.get('password')
 
-    # 1. Validate Input
     if not username or not password:
         return Response(
             {'success': False, 'message': 'Username and password required'},
             status=status.HTTP_400_BAD_REQUEST
         )
-    
+
     try:
-        # 2. Find User
         user = ERPUser.objects.get(username=username)
-        
-        # 3. Check Password
+
         if check_password(password, user.password_hash):
             if not user.is_active:
                 return Response(
@@ -147,14 +141,11 @@ def erp_user_login(request):
                     status=status.HTTP_403_FORBIDDEN
                 )
 
-            # 4. Update Last Login (Avoid running full save logic if possible)
             user.last_login = datetime.now()
             user.save(update_fields=['last_login'])
 
-            # 5. Generate JWT Tokens
             refresh = RefreshToken.for_user(user)
-            
-            # 6. Construct Final Response
+
             return Response({
                 'success': True,
                 'message': 'Login successful',
@@ -176,12 +167,13 @@ def erp_user_login(request):
             status=status.HTTP_404_NOT_FOUND
         )
 
+
 class ERPUserByRoleView(generics.ListAPIView):
     """GET /api/erp-users/role/<role>/"""
     serializer_class = ERPUserListSerializer
 
     def get_queryset(self):
-        return ERPUser.objects.filter(role=self.kwargs['role'], is_active=True)
+        return ERPUser.objects.filter(roles__contains=[self.kwargs['role']], is_active=True)
 
 
 # =====================================================
@@ -279,8 +271,8 @@ class ERPCustomerDetailView(generics.RetrieveUpdateDestroyAPIView):
 class ERPCustomerCreateView(generics.CreateAPIView):
     queryset = ERPCustomer.objects.all()
     serializer_class = ERPCustomerSerializer
+
     def perform_create(self, serializer):
-        # জোরপূর্বক ইজ অ্যাক্টিভ ট্রু করে সেভ করা
         serializer.save(is_active=True)
 
 
@@ -309,7 +301,6 @@ class ERPLeadDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ERPLeadCreateView(generics.CreateAPIView):
-    """A lead can only be assigned to one officer (enforced by FK in model)."""
     queryset = ERPLead.objects.all()
     serializer_class = ERPLeadSerializer
 
@@ -345,29 +336,25 @@ class ERPBookingDetailView(generics.RetrieveUpdateDestroyAPIView):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
-        
-        # আপডেট সেভ করা
         booking = serializer.save()
 
-        # যদি ডাউন পেমেন্ট আপডেট হয় তবে কিস্তি পুনরায় হিসাব করা
         if 'down_payment_amount' in request.data:
             self._recalculate_installments(booking)
-            # রিক্যালকুলেশনের পর ডাটাবেস থেকে লেটেস্ট অবজেক্ট রিফ্রেশ করা
             booking.refresh_from_db()
 
         return Response(self.get_serializer(booking).data)
 
     def _recalculate_installments(self, booking):
-        # installment_plan যদি related_name হয় তবেই এটি কাজ করবে
         unpaid_installments = booking.installment_plan.filter(is_paid=False)
         count = unpaid_installments.count()
-        
+
         if count > 0:
             per_installment = booking.total_due / count
             for inst in unpaid_installments:
                 inst.amount = round(per_installment, 2)
                 inst.due_amount = inst.amount - inst.paid_amount
                 inst.save()
+
 
 class ERPBookingCreateView(generics.CreateAPIView):
     queryset = ERPBooking.objects.all()
@@ -376,16 +363,12 @@ class ERPBookingCreateView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
-        # ডাটাবেসে সেভ করা (মডেলের save() মেথড কল হবে এবং pricing ক্যালকুলেট হবে)
         booking = serializer.save()
-        
-        # প্লটের স্ট্যাটাস আপডেট করা
+
         if booking.plot:
             booking.plot.status = 'booked'
             booking.plot.save()
-            
-        # রেসপন্স পাঠানোর সময় নতুন ক্যালকুলেটেড ডাটা সহ পাঠানো
+
         return Response(self.get_serializer(booking).data, status=status.HTTP_201_CREATED)
 
 
@@ -393,25 +376,8 @@ class ERPBookingCreateView(generics.CreateAPIView):
 # 8. INSTALLMENT PLAN VIEWS
 # =====================================================
 
-# class ERPInstallmentPlanListView(generics.ListAPIView):
-#     """GET /api/erp-installments/ — ?booking=<id>"""
-#     serializer_class = ERPInstallmentPlanSerializer
-
-#     def get_queryset(self):
-#         qs = ERPInstallmentPlan.objects.all()
-#         booking_id = self.request.query_params.get('booking')
-#         if booking_id:
-#             qs = qs.filter(booking_id=booking_id)
-#         return qs
-
-
-# class ERPInstallmentPlanDetailView(generics.RetrieveUpdateDestroyAPIView):
-#     queryset = ERPInstallmentPlan.objects.all()
-#     serializer_class = ERPInstallmentPlanSerializer
-
-
 from dateutil.relativedelta import relativedelta
-from decimal import Decimal
+
 
 class ERPInstallmentPlanListView(generics.ListAPIView):
     queryset = ERPInstallmentPlan.objects.all()
@@ -426,65 +392,60 @@ class ERPBookingSpecificInstallmentListView(generics.ListAPIView):
     serializer_class = ERPInstallmentPlanSerializer
 
     def get_queryset(self):
-        # URL থেকে booking_code সংগ্রহ করা হচ্ছে
         booking_code = self.kwargs['booking_code']
-        # ওই বুকিং কোড অনুযায়ী কিস্তিগুলো ফিল্টার করা
         return ERPInstallmentPlan.objects.filter(booking__booking_code=booking_code)
-    
-    
+
+
 class ERPInstallmentUpdateView(generics.RetrieveUpdateAPIView):
     queryset = ERPInstallmentPlan.objects.all()
     serializer_class = ERPInstallmentPlanSerializer
-    
 
 
-class ERPGenerateInstallmentScheduleView(generics.GenericAPIView):
+class ERPGenerateInstallmentScheduleView(APIView):
     """
     booking_code ব্যবহার করে পুরো কিস্তি শিডিউল জেনারেট করার লজিক।
     Input: booking_code, number_of_installments, start_date
     """
     def post(self, request):
-        # এখন আমরা booking_id এর বদলে booking_code নিচ্ছি
         booking_code = request.data.get('booking_code')
         num_inst_raw = request.data.get('number_of_installments')
         start_date_str = request.data.get('start_date')
 
-        # বেসিক ভ্যালিডেশন
         if not all([booking_code, num_inst_raw, start_date_str]):
             return Response(
-                {"error": "booking_code, number_of_installments and start_date are required."}, 
+                {"error": "booking_code, number_of_installments and start_date are required."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
-            from .models import ERPBooking, ERPInstallmentPlan
             num_inst = int(num_inst_raw)
-            
-            # booking_code দিয়ে অবজেক্টটি খুঁজে বের করা
+
             try:
                 booking = ERPBooking.objects.get(booking_code=booking_code)
             except ERPBooking.DoesNotExist:
-                return Response({"error": f"Booking with code {booking_code} not found."}, status=status.HTTP_404_NOT_FOUND)
-            
-            # ১. আগের কোনো শিডিউল থাকলে ডিলিট করা
+                return Response(
+                    {"error": f"Booking with code {booking_code} not found."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
             booking.installment_plan.all().delete()
 
-            # ২. ক্যালকুলেশন শুরু
             total_to_distribute = booking.total_due
-            
+
             if total_to_distribute <= 0:
-                return Response({"error": "Total due is 0. No installments needed."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": "Total due is 0. No installments needed."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
             amount_per_inst = round(total_to_distribute / num_inst, 2)
             current_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            
+
             installments = []
             cumulative_amount = Decimal('0.00')
 
-            # ৩. লুপ চালিয়ে কিস্তি তৈরি
             for i in range(1, num_inst + 1):
                 if i == num_inst:
-                    # শেষ কিস্তিতে পয়সার রাউন্ডিং অ্যাডজাস্ট করা
                     inst_amount = total_to_distribute - cumulative_amount
                 else:
                     inst_amount = Decimal(str(amount_per_inst))
@@ -497,33 +458,27 @@ class ERPGenerateInstallmentScheduleView(generics.GenericAPIView):
                     amount=inst_amount,
                     due_amount=inst_amount
                 ))
-                # প্রতি কিস্তিতে ১ মাস বৃদ্ধি
                 current_date += relativedelta(months=1)
 
-            # ৪. Bulk Create ব্যবহার করে একবারে সেভ করা
             ERPInstallmentPlan.objects.bulk_create(installments)
-            
+
             return Response(
-                {"message": f"Successfully generated {num_inst} installments for booking {booking_code}."}, 
+                {"message": f"Successfully generated {num_inst} installments for booking {booking_code}."},
                 status=status.HTTP_201_CREATED
             )
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
-
-
 
 
 # =====================================================
 # 9. MONEY RECEIPT VIEWS
 # =====================================================
+
 from django.template.loader import render_to_string
 from weasyprint import HTML
 from django.http import HttpResponse
-from datetime import datetime
-from rest_framework import generics, status
-from rest_framework.response import Response
+
 
 class ERPMoneyReceiptListView(generics.ListAPIView):
     """GET /api/erp-receipts/ — ?booking=<id>&customer=<id>&status=<status>"""
@@ -552,6 +507,7 @@ class ERPMoneyReceiptDetailView(generics.RetrieveUpdateDestroyAPIView):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         new_status = request.data.get('status')
+
         if new_status == 'complete' and instance.status == 'pending':
             instance.completed_by = request.data.get('completed_by', '')
             instance.completed_at = datetime.now()
@@ -561,6 +517,7 @@ class ERPMoneyReceiptDetailView(generics.RetrieveUpdateDestroyAPIView):
             instance.e_sign = True
             instance.e_sign_date = datetime.now()
             self._update_booking_payment(instance)
+
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -578,9 +535,7 @@ class ERPMoneyReceiptDetailView(generics.RetrieveUpdateDestroyAPIView):
             inst.due_amount = inst.amount - inst.paid_amount
             if inst.paid_amount >= inst.amount:
                 inst.is_paid = True
-                inst.paid_date = receipt.payment_date
             inst.save()
-
 
 
 class ERPMoneyReceiptCreateView(generics.CreateAPIView):
@@ -591,49 +546,15 @@ class ERPMoneyReceiptCreateView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         receipt = serializer.save()
+        return Response(self.get_serializer(receipt).data, status=status.HTTP_201_CREATED)
 
-        # কমিশন ট্রিগার লজিক
-        if receipt.payment_mode == 'cash' and receipt.status == 'authorized':
-            self._trigger_commission(receipt)
 
-        # রেসপন্স ডাটা তৈরি
-        data = self.get_serializer(receipt).data
-        
-        # যদি সাথে সাথে PDF ডাউনলোড করতে চান, তবে আলাদা URL ব্যবহার করা ভালো। 
-        # তবে ক্রিয়েট করার সময় শুধু ডাটা রিটার্ন করাই স্ট্যান্ডার্ড।
-        return Response(data, status=status.HTTP_201_CREATED)
-
-    def _trigger_commission(self, receipt):
-        booking = receipt.booking
-        if booking and booking.marketing_officer:
-            pending_commissions = ERPCommission.objects.filter(
-                booking=booking,
-                is_cash_payment=True,
-                wallet_hit=False
-            )
-            for commission in pending_commissions:
-                commission.wallet_hit = True
-                commission.wallet_hit_at = datetime.now()
-                commission.status = 'paid'
-                commission.save()
-                
-                wallet = ERPWallet.objects.filter(
-                    user=commission.marketing_officer.user
-                ).first()
-                if wallet:
-                    wallet.balance += commission.commission_amount
-                    wallet.save()
-
-# PDF জেনারেশনের জন্য আলাদা একটি View রাখা ভালো
 class ERPMoneyReceiptDownloadView(generics.RetrieveAPIView):
     queryset = ERPMoneyReceipt.objects.all()
 
     def get(self, request, *args, **kwargs):
         receipt_obj = self.get_object()
-        
-        # Amount in Words ডাইনামিক করার জন্য num2words লাইব্রেরি ব্যবহার করতে পারেন
-        # অথবা আপনার ম্যানুয়াল ফরম্যাট
-        amount_in_words = f"BDT: {receipt_obj.amount} Taka Only." 
+        amount_in_words = f"BDT: {receipt_obj.amount} Taka Only."
 
         context = {
             'receipt': receipt_obj,
@@ -647,6 +568,8 @@ class ERPMoneyReceiptDownloadView(generics.RetrieveAPIView):
         response = HttpResponse(pdf, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="Receipt_{receipt_obj.receipt_number}.pdf"'
         return response
+
+
 # =====================================================
 # 10. VOUCHER VIEWS
 # =====================================================
@@ -669,7 +592,6 @@ class ERPVoucherDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ERPVoucherCreateView(generics.CreateAPIView):
-    """No backdated entry. Auto print on creation."""
     queryset = ERPVoucher.objects.all()
     serializer_class = ERPVoucherSerializer
 
@@ -694,7 +616,6 @@ class ERPProjectVisitListView(generics.ListAPIView):
 
 
 class ERPProjectVisitDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Admin confirms the visit."""
     queryset = ERPProjectVisit.objects.all()
     serializer_class = ERPProjectVisitSerializer
 
@@ -712,7 +633,6 @@ class ERPProjectVisitDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ERPProjectVisitCreateView(generics.CreateAPIView):
-    """Marketing officer adds visit; admin confirms. System sends notifications."""
     queryset = ERPProjectVisit.objects.all()
     serializer_class = ERPProjectVisitSerializer
 
@@ -737,7 +657,7 @@ class ERPMarketingOfficerCreateView(generics.CreateAPIView):
 
 
 class ERPMarketingOfficerDownlineView(generics.ListAPIView):
-    """GET /api/erp-officers/<pk>/downline/ — Team leader sees only their downline."""
+    """GET /api/erp-officers/<pk>/downline/"""
     serializer_class = ERPMarketingOfficerSerializer
 
     def get_queryset(self):
@@ -796,6 +716,7 @@ class ERPWalletTransactionCreateView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         transaction_type = request.data.get('transaction_type')
         amount = float(request.data.get('amount', 0))
+
         if transaction_type == 'withdrawal':
             if amount < 1000:
                 return Response(
@@ -815,65 +736,410 @@ class ERPWalletTransactionCreateView(generics.CreateAPIView):
                             {'error': 'No withdrawable amount after loan deduction.'},
                             status=status.HTTP_400_BAD_REQUEST
                         )
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        transaction = serializer.save()
-        wallet = transaction.wallet
-        if transaction.transaction_type == 'withdrawal':
-            wallet.balance -= transaction.amount
+        txn = serializer.save()
+        wallet = txn.wallet
+        if txn.transaction_type == 'withdrawal':
+            wallet.balance -= txn.amount
         else:
-            wallet.balance += transaction.amount
+            wallet.balance += txn.amount
         wallet.save()
-        return Response(self.get_serializer(transaction).data, status=status.HTTP_201_CREATED)
+        return Response(self.get_serializer(txn).data, status=status.HTTP_201_CREATED)
 
 
 # =====================================================
 # 14. COMMISSION VIEWS
 # =====================================================
 
-class ERPCommissionRuleListView(generics.ListAPIView):
-    """GET /api/erp-commission-rules/ — Management can change."""
-    queryset = ERPCommissionRule.objects.filter(is_active=True)
-    serializer_class = ERPCommissionRuleSerializer
-
-
-class ERPCommissionRuleDetailView(generics.RetrieveUpdateDestroyAPIView):
+class CommissionRuleListCreateView(generics.ListCreateAPIView):
     queryset = ERPCommissionRule.objects.all()
     serializer_class = ERPCommissionRuleSerializer
 
 
-class ERPCommissionRuleCreateView(generics.CreateAPIView):
+class CommissionRuleDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ERPCommissionRule.objects.all()
     serializer_class = ERPCommissionRuleSerializer
 
 
-class ERPCommissionListView(generics.ListAPIView):
-    """GET /api/erp-commissions/ — ?officer=<id>&booking=<id>&status=<status>"""
+class CommissionListView(generics.ListAPIView):
     serializer_class = ERPCommissionSerializer
 
     def get_queryset(self):
         qs = ERPCommission.objects.all()
-        officer_id = self.request.query_params.get('officer')
-        booking_id = self.request.query_params.get('booking')
+        officer = self.request.query_params.get('officer')
         comm_status = self.request.query_params.get('status')
-        if officer_id:
-            qs = qs.filter(marketing_officer_id=officer_id)
-        if booking_id:
-            qs = qs.filter(booking_id=booking_id)
+        booking = self.request.query_params.get('booking')
+        if officer:
+            qs = qs.filter(marketing_officer_id=officer)
         if comm_status:
             qs = qs.filter(status=comm_status)
+        if booking:
+            qs = qs.filter(booking_id=booking)
         return qs
 
 
-class ERPCommissionDetailView(generics.RetrieveUpdateDestroyAPIView):
+class CommissionDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ERPCommission.objects.all()
     serializer_class = ERPCommissionSerializer
 
+# =====================================================
+# ✅ FIXED: GenerateCommissionView
+# ====================================================
 
-class ERPCommissionCreateView(generics.CreateAPIView):
-    """Commission up to 9/10 generations. Cash → wallet immediately. Cheque/bank → after clearing."""
-    queryset = ERPCommission.objects.all()
-    serializer_class = ERPCommissionSerializer
+
+
+class GenerateCommissionView(APIView):
+    """
+    POST /api/generate-commission/
+
+    একটি payment হলে এই endpoint call করলে
+    পুরো upline chain এ commission তৈরি হবে এবং
+    wallet এ টাকা credit হবে।
+
+    Request Body:
+    {
+        "booking":     5,            ← ERPBooking এর id (required)
+        "amount":      25000,        ← যত টাকা payment হয়েছে (required)
+        "source_type": "booking",    ← payment এর ধরন (required)
+        "receipt":     12            ← ERPMoneyReceipt এর id (optional)
+    }
+
+    source_type এর মান হতে পারে:
+        booking / installment / down_payment / investment /
+        registration / land_dev / parking / transfer / utility
+
+    Response:
+    {
+        "message": "3 commission(s) generated successfully",
+        "commissions_created": 3,
+        "details": [
+            {
+                "officer": "Rahim",
+                "generation": 0,
+                "generation_label": "Direct",
+                "source_type": "booking",
+                "rate": "25.000",
+                "base_amount": "25000.00",
+                "commission_amount": "6250.00",
+                "status": "paid"
+            },
+            ...
+        ]
+    }
+    """
+
+
+    def post(self, request):
+        # ---- Input নেওয়া ----
+        booking_id  = request.data.get('booking')
+        amount      = request.data.get('amount')
+        source_type = request.data.get('source_type')
+        receipt_id  = request.data.get('receipt')   # optional
+
+        # ---- Required field validation ----
+        if not booking_id:
+            return Response(
+                {"error": "'booking' field required. ERPBooking এর id দিন।"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not amount:
+            return Response(
+                {"error": "'amount' field required। payment এর পরিমাণ দিন।"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not source_type:
+            return Response(
+                {"error": "'source_type' field required। booking/installment/down_payment ইত্যাদি দিন।"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # source_type validation
+        valid_sources = [
+            'booking', 'installment', 'down_payment', 'investment',
+            'registration', 'land_dev', 'parking', 'transfer', 'utility',
+        ]
+        if source_type not in valid_sources:
+            return Response(
+                {"error": f"'source_type' অবশ্যই এগুলোর একটি হতে হবে: {', '.join(valid_sources)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ---- Booking খোঁজা ----
+        try:
+            booking = ERPBooking.objects.select_related(
+                'marketing_officer',
+                'marketing_officer__user',
+                'marketing_officer__upline',
+                'project',
+            ).get(id=booking_id)
+        except ERPBooking.DoesNotExist:
+            return Response(
+                {"error": f"Booking id={booking_id} পাওয়া যায়নি।"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # ---- Marketing Officer আছে কিনা চেক ----
+        if not booking.marketing_officer:
+            return Response(
+                {"error": f"Booking '{booking.booking_code}' এ কোনো Marketing Officer নেই। Commission দেওয়া সম্ভব নয়।"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ---- Receipt খোঁজা (optional) ----
+        receipt = None
+        if receipt_id:
+            try:
+                receipt = ERPMoneyReceipt.objects.get(id=receipt_id)
+            except ERPMoneyReceipt.DoesNotExist:
+                # receipt না পেলেও commission চলবে, শুধু warning দেওয়া হবে
+                pass
+
+        # ---- Commission Generate করা ----
+        try:
+            from mainapp.services import generate_commission
+            commissions = generate_commission(
+                booking=booking,
+                amount=amount,
+                source_type=source_type,
+                receipt=receipt,
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Commission generate করতে সমস্যা হয়েছে: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # ---- Response তৈরি করা ----
+        # প্রতিটি commission এর detail response এ দেখানো
+        details = []
+        for comm in commissions:
+            gen_label = "Direct (Shaki)" if comm.generation == 0 else f"{comm.generation}st/nd/rd/th Gen"
+            # সঠিক ordinal suffix
+            gen_num = comm.generation
+            if gen_num == 0:
+                gen_label = "Direct (Shaki)"
+            elif gen_num == 1:
+                gen_label = "1st"
+            elif gen_num == 2:
+                gen_label = "2nd"
+            elif gen_num == 3:
+                gen_label = "3rd"
+            else:
+                gen_label = f"{gen_num}th"
+
+            details.append({
+                "officer":           comm.marketing_officer.user.full_name,
+                "officer_code":      comm.marketing_officer.officer_code,
+                "generation":        comm.generation,
+                "generation_label":  gen_label,
+                "source_type":       comm.source_type,
+                "rate":              str(comm.commission_rate),
+                "base_amount":       str(comm.base_amount),
+                "commission_amount": str(comm.commission_amount),
+                "status":            comm.status,
+                "wallet_hit":        comm.wallet_hit,
+            })
+
+        if not commissions:
+            return Response({
+                "message": "কোনো Commission তৈরি হয়নি। Commission Rule না থাকলে অথবা amount 0 হলে এটি হতে পারে।",
+                "commissions_created": 0,
+                "details": [],
+                "hint": f"project={booking.project_id}, source_type={source_type} এর জন্য ERPCommissionRule আছে কিনা চেক করুন।"
+            }, status=status.HTTP_200_OK)
+
+        return Response({
+            "message":            f"{len(commissions)} commission(s) generated successfully",
+            "commissions_created": len(commissions),
+            "booking_code":       booking.booking_code,
+            "source_type":        source_type,
+            "total_amount_paid":  str(amount),
+            "details":            details,
+        }, status=status.HTTP_201_CREATED)
+
+
+# =====================================================
+# 14B. COMMISSION DASHBOARD
+# =====================================================
+
+
+
+@api_view(['GET'])
+def commission_dashboard(request):
+    """
+    GET /api/commission-dashboard/
+
+    স্ক্রিনশটের মতো Generation × Source-Type টেবিল।
+
+    Optional Query Params:
+        ?project=<id>
+        ?officer=<id>
+        ?date_from=YYYY-MM-DD
+        ?date_to=YYYY-MM-DD
+    """
+    project_id = request.query_params.get('project')
+    officer_id = request.query_params.get('officer')
+    date_from  = request.query_params.get('date_from')
+    date_to    = request.query_params.get('date_to')
+
+    qs = ERPCommission.objects.all()
+
+    if project_id:
+        qs = qs.filter(booking__project_id=project_id)
+    if officer_id:
+        qs = qs.filter(marketing_officer_id=officer_id)
+    if date_from:
+        qs = qs.filter(created_at__date__gte=date_from)
+    if date_to:
+        qs = qs.filter(created_at__date__lte=date_to)
+
+    SOURCE_TYPES = [
+        'booking', 'installment', 'down_payment', 'investment',
+        'registration', 'land_dev', 'parking', 'transfer', 'utility',
+    ]
+
+    GENERATION_LABELS = {
+        0: 'Direct (Shaki)',
+        1: '1st',
+        2: '2nd',
+        3: '3rd',
+        4: '4th',
+        5: '5th',
+        6: '6th',
+        7: '7th',
+    }
+
+    # Overall Summary
+    summary_agg = qs.aggregate(
+        total_commission=Sum('commission_amount'),
+        total_paid=Sum('commission_amount', filter=Q(status='paid')),
+        total_pending=Sum('commission_amount', filter=Q(status__in=['pending', 'approved'])),
+        total_officers=Count('marketing_officer', distinct=True),
+    )
+
+    # Generation-wise breakdown
+    by_generation = []
+    column_totals = {src: Decimal('0.00') for src in SOURCE_TYPES}
+    grand_total   = Decimal('0.00')
+
+    for gen in range(0, 8):
+        row = {
+            'generation':       gen,
+            'generation_label': GENERATION_LABELS.get(gen, f'Gen {gen}'),
+        }
+        row_total = Decimal('0.00')
+
+        for source in SOURCE_TYPES:
+            agg = qs.filter(
+                generation=gen,
+                source_type=source
+            ).aggregate(
+                total_amount=Sum('commission_amount'),
+                total_rate=Sum('commission_rate'),
+            )
+
+            amount = agg['total_amount'] or Decimal('0.00')
+            rate   = agg['total_rate']   or Decimal('0.000')
+
+            row[source] = {
+                'percent': float(rate),
+                'amount':  float(amount),
+            }
+
+            row_total             += amount
+            column_totals[source] += amount
+
+        row['row_total'] = float(row_total)
+        grand_total      += row_total
+        by_generation.append(row)
+
+    column_totals_response = {
+        src: {'amount': float(column_totals[src])}
+        for src in SOURCE_TYPES
+    }
+    column_totals_response['grand_total'] = {'amount': float(grand_total)}
+
+    return Response({
+        'summary': {
+            'total_commission': float(summary_agg['total_commission'] or 0),
+            'total_paid':       float(summary_agg['total_paid']       or 0),
+            'total_pending':    float(summary_agg['total_pending']     or 0),
+            'total_officers':   summary_agg['total_officers']          or 0,
+        },
+        'by_generation':  by_generation,
+        'column_totals':  column_totals_response,
+    })
+
+
+@api_view(['GET'])
+def officer_commission_detail(request, officer_id):
+    """
+    GET /api/commission-dashboard/officer/<officer_id>/
+    একজন নির্দিষ্ট officer এর commission detail।
+    """
+    try:
+        officer = ERPMarketingOfficer.objects.select_related('user').get(id=officer_id)
+    except ERPMarketingOfficer.DoesNotExist:
+        return Response({'error': 'Officer not found'}, status=404)
+
+    commissions = ERPCommission.objects.filter(marketing_officer=officer)
+
+    gen_summary = {}
+    for comm in commissions:
+        gen = comm.generation
+        if gen not in gen_summary:
+            gen_summary[gen] = {
+                'generation':       gen,
+                'label':            'Direct' if gen == 0 else f'Gen {gen}',
+                'count':            0,
+                'total_amount':     Decimal('0.00'),
+                'paid_amount':      Decimal('0.00'),
+                'pending_amount':   Decimal('0.00'),
+            }
+        gen_summary[gen]['count']        += 1
+        gen_summary[gen]['total_amount'] += comm.commission_amount
+        if comm.status == 'paid':
+            gen_summary[gen]['paid_amount']    += comm.commission_amount
+        else:
+            gen_summary[gen]['pending_amount'] += comm.commission_amount
+
+    gen_list = []
+    for gen, data in sorted(gen_summary.items()):
+        gen_list.append({
+            **data,
+            'total_amount':   float(data['total_amount']),
+            'paid_amount':    float(data['paid_amount']),
+            'pending_amount': float(data['pending_amount']),
+        })
+
+    overall = commissions.aggregate(
+        total=Sum('commission_amount'),
+        paid=Sum('commission_amount', filter=Q(status='paid')),
+    )
+
+    wallet_balance = 0
+    try:
+        wallet_balance = float(officer.user.wallet.balance)
+    except Exception:
+        pass
+
+    return Response({
+        'officer': {
+            'id':             officer.id,
+            'name':           officer.user.full_name,
+            'code':           officer.officer_code,
+            'rank':           officer.get_rank_display(),
+            'wallet_balance': wallet_balance,
+        },
+        'commission_summary': {
+            'total':   float(overall['total'] or 0),
+            'paid':    float(overall['paid']   or 0),
+            'pending': float((overall['total'] or 0) - (overall['paid'] or 0)),
+        },
+        'by_generation': gen_list,
+    })
 
 
 # =====================================================
@@ -898,7 +1164,6 @@ class ERPLoanDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ERPLoanCreateView(generics.CreateAPIView):
-    """Short-term loan — auto-deducted from commission/incentive/salary."""
     queryset = ERPLoan.objects.all()
     serializer_class = ERPLoanSerializer
 
@@ -918,7 +1183,7 @@ class ERPLoanCreateView(generics.CreateAPIView):
 # =====================================================
 
 class ERPInvestorListView(generics.ListAPIView):
-    queryset = ERPInvestor.objects.filter()
+    queryset = ERPInvestor.objects.all()
     serializer_class = ERPInvestorSerializer
 
 
@@ -939,7 +1204,7 @@ class ERPInvestmentListView(generics.ListAPIView):
     def get_queryset(self):
         qs = ERPInvestment.objects.all()
         investor_id = self.request.query_params.get('investor')
-        inv_status = self.request.query_params.get('status')
+        inv_status  = self.request.query_params.get('status')
         if investor_id:
             qs = qs.filter(investor_id=investor_id)
         if inv_status:
@@ -948,13 +1213,11 @@ class ERPInvestmentListView(generics.ListAPIView):
 
 
 class ERPInvestmentDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Asset transfer between products. Cancellation → phased refund."""
     queryset = ERPInvestment.objects.all()
     serializer_class = ERPInvestmentSerializer
 
 
 class ERPInvestmentCreateView(generics.CreateAPIView):
-    print("arjun")
     queryset = ERPInvestment.objects.all()
     serializer_class = ERPInvestmentSerializer
 
@@ -962,11 +1225,10 @@ class ERPInvestmentCreateView(generics.CreateAPIView):
 class ERPDividendListView(generics.ListAPIView):
     """GET /api/erp-dividends/ — ?investor=<id>&investment=<id>"""
     serializer_class = ERPDividendSerializer
-    print("arjun")
 
     def get_queryset(self):
         qs = ERPDividend.objects.all()
-        investor_id = self.request.query_params.get('investor')
+        investor_id   = self.request.query_params.get('investor')
         investment_id = self.request.query_params.get('investment')
         if investor_id:
             qs = qs.filter(investor_id=investor_id)
@@ -980,12 +1242,9 @@ class ERPDividendDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ERPDividendSerializer
 
 
-
 from decimal import Decimal, ROUND_HALF_UP
-from django.db import transaction
-from django.utils import timezone
-from rest_framework import status, generics
-from rest_framework.response import Response
+from django.utils import timezone as tz
+
 
 class ERPDividendCreateView(generics.CreateAPIView):
     queryset = ERPDividend.objects.all()
@@ -993,8 +1252,8 @@ class ERPDividendCreateView(generics.CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         investment_id = request.data.get('investment')
-        month = request.data.get('month')
-        year = request.data.get('year')
+        month         = request.data.get('month')
+        year          = request.data.get('year')
 
         if not all([investment_id, month, year]):
             return Response(
@@ -1005,68 +1264,47 @@ class ERPDividendCreateView(generics.CreateAPIView):
         try:
             investment = ERPInvestment.objects.select_related('investor__user').get(id=investment_id)
 
-            # 🚫 Duplicate check
-            # if ERPDividend.objects.filter(
-            #     investment=investment,
-            #     month=month,
-            #     year=year
-            # ).exists():
-            #     return Response(
-            #         {"error": "Dividend already created for this month"},
-            #         status=status.HTTP_400_BAD_REQUEST
-            #     )
-
-            base_amount = Decimal(str(investment.invest_amount))
-            rate_percent = Decimal(str(investment.monthly_dividend_rate))
-
-            # 👉 calculation
-            dividend_amount = (
-                base_amount * rate_percent / Decimal('100')
-            ).quantize(Decimal('0.00'), rounding=ROUND_HALF_UP)
+            base_amount     = Decimal(str(investment.invest_amount))
+            rate_percent    = Decimal(str(investment.monthly_dividend_rate))
+            dividend_amount = (base_amount * rate_percent / Decimal('100')).quantize(
+                Decimal('0.00'), rounding=ROUND_HALF_UP
+            )
 
             with transaction.atomic():
-
-                # 🔐 wallet lock with get()
                 wallet = ERPWallet.objects.select_for_update().get(
                     user=investment.investor.user,
                     wallet_type='investor'
                 )
 
-                # ✅ create dividend
                 dividend = ERPDividend.objects.create(
                     investment=investment,
                     investor=investment.investor,
                     month=month,
                     year=year,
                     base_amount=base_amount,
-                    dividend_rate=rate_percent,  # store percent
+                    dividend_rate=rate_percent,
                     dividend_amount=dividend_amount,
                     status='paid',
                     wallet_credited=True,
-                    wallet_credited_at=timezone.now()
+                    wallet_credited_at=tz.now()
                 )
 
-                # 💰 wallet update
                 wallet.balance += dividend_amount
                 wallet.save()
 
-                # 📈 update investment লাভ
                 investment.total_profit_received += dividend_amount
                 investment.save()
 
-            return Response(
-                self.get_serializer(dividend).data,
-                status=status.HTTP_201_CREATED
-            )
+            return Response(self.get_serializer(dividend).data, status=status.HTTP_201_CREATED)
 
         except ERPInvestment.DoesNotExist:
             return Response({"error": "Investment not found"}, status=404)
-
         except ERPWallet.DoesNotExist:
             return Response({"error": "Investor wallet not found"}, status=404)
-
         except Exception as e:
             return Response({"error": str(e)}, status=500)
+
+
 # =====================================================
 # 17. HR VIEWS
 # =====================================================
@@ -1096,8 +1334,8 @@ class ERPAttendanceListView(generics.ListAPIView):
     def get_queryset(self):
         qs = ERPAttendance.objects.all()
         employee_id = self.request.query_params.get('employee')
-        month = self.request.query_params.get('month')
-        year = self.request.query_params.get('year')
+        month       = self.request.query_params.get('month')
+        year        = self.request.query_params.get('year')
         if employee_id:
             qs = qs.filter(employee_id=employee_id)
         if month and year:
@@ -1111,7 +1349,6 @@ class ERPAttendanceDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ERPAttendanceCreateView(generics.CreateAPIView):
-    """Data comes from fingerprint device."""
     queryset = ERPAttendance.objects.all()
     serializer_class = ERPAttendanceSerializer
 
@@ -1123,8 +1360,8 @@ class ERPPayrollListView(generics.ListAPIView):
     def get_queryset(self):
         qs = ERPPayroll.objects.all()
         employee_id = self.request.query_params.get('employee')
-        month = self.request.query_params.get('month')
-        year = self.request.query_params.get('year')
+        month       = self.request.query_params.get('month')
+        year        = self.request.query_params.get('year')
         if employee_id:
             qs = qs.filter(employee_id=employee_id)
         if month:
@@ -1140,7 +1377,6 @@ class ERPPayrollDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ERPPayrollCreateView(generics.CreateAPIView):
-    """Salary calculated based on attendance. Printable at month end."""
     queryset = ERPPayroll.objects.all()
     serializer_class = ERPPayrollSerializer
 
@@ -1148,23 +1384,25 @@ class ERPPayrollCreateView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         payroll = serializer.save()
+
         attendance_count = ERPAttendance.objects.filter(
             employee_id=payroll.employee_id,
             attendance_date__month=payroll.month,
             attendance_date__year=payroll.year,
             status__in=['present', 'late', 'half_day']
         ).count()
-        payroll.present_days = attendance_count
-        working_days = payroll.working_days or 26
-        daily_rate = float(payroll.basic_salary) / working_days
+
+        payroll.present_days  = attendance_count
+        working_days          = payroll.working_days or 26
+        daily_rate            = float(payroll.basic_salary) / working_days
         payroll.payable_salary = round(daily_rate * attendance_count, 2)
-        payroll.net_salary = payroll.payable_salary - float(payroll.loan_deduction)
+        payroll.net_salary    = payroll.payable_salary - float(payroll.loan_deduction)
         payroll.save()
         return Response(self.get_serializer(payroll).data, status=status.HTTP_201_CREATED)
 
 
 # =====================================================
-# 18. OFFICER REQUEST VIEWS (TA/DA/Commission)
+# 18. OFFICER REQUEST VIEWS
 # =====================================================
 
 class ERPOfficerRequestListView(generics.ListAPIView):
@@ -1173,9 +1411,9 @@ class ERPOfficerRequestListView(generics.ListAPIView):
 
     def get_queryset(self):
         qs = ERPOfficerRequest.objects.all()
-        officer_id = self.request.query_params.get('officer')
-        req_status = self.request.query_params.get('status')
-        req_type = self.request.query_params.get('type')
+        officer_id  = self.request.query_params.get('officer')
+        req_status  = self.request.query_params.get('status')
+        req_type    = self.request.query_params.get('type')
         if officer_id:
             qs = qs.filter(officer_id=officer_id)
         if req_status:
@@ -1186,7 +1424,6 @@ class ERPOfficerRequestListView(generics.ListAPIView):
 
 
 class ERPOfficerRequestDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Accounts/Admin/Department head approves."""
     queryset = ERPOfficerRequest.objects.all()
     serializer_class = ERPOfficerRequestSerializer
 
@@ -1204,13 +1441,12 @@ class ERPOfficerRequestDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ERPOfficerRequestCreateView(generics.CreateAPIView):
-    """Officer submits request. Commission withdrawal minimum 1000 taka."""
     queryset = ERPOfficerRequest.objects.all()
     serializer_class = ERPOfficerRequestSerializer
 
     def create(self, request, *args, **kwargs):
         req_type = request.data.get('request_type')
-        amount = float(request.data.get('amount', 0))
+        amount   = float(request.data.get('amount', 0))
         if req_type == 'commission_withdrawal' and amount < 1000:
             return Response(
                 {'error': 'Minimum 1000 taka required for commission withdrawal.'},
@@ -1246,12 +1482,11 @@ class ERPAccountHeadCreateView(generics.CreateAPIView):
 # =====================================================
 
 class ERPOfferListView(generics.ListAPIView):
-    """GET /api/erp-offers/ — ?project=<id>&active=true. Max 90 days."""
     serializer_class = ERPOfferSerializer
 
     def get_queryset(self):
         qs = ERPOffer.objects.all()
-        project_id = self.request.query_params.get('project')
+        project_id  = self.request.query_params.get('project')
         active_only = self.request.query_params.get('active')
         if project_id:
             qs = qs.filter(project_id=project_id)
@@ -1266,16 +1501,15 @@ class ERPOfferDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ERPOfferCreateView(generics.CreateAPIView):
-    """Offer cannot exceed 90 days."""
     queryset = ERPOffer.objects.all()
     serializer_class = ERPOfferSerializer
 
     def create(self, request, *args, **kwargs):
         valid_from = request.data.get('valid_from')
-        valid_to = request.data.get('valid_to')
+        valid_to   = request.data.get('valid_to')
         if valid_from and valid_to:
             from_date = date.fromisoformat(valid_from)
-            to_date = date.fromisoformat(valid_to)
+            to_date   = date.fromisoformat(valid_to)
             if (to_date - from_date).days > 90:
                 return Response(
                     {'error': 'Offer duration cannot exceed 90 days.'},
@@ -1292,13 +1526,12 @@ class ERPOfferCreateView(generics.CreateAPIView):
 # =====================================================
 
 class ERPSMSLogListView(generics.ListAPIView):
-    """GET /api/erp-sms-logs/ — ?customer=<id>&type=<type>"""
     serializer_class = ERPSMSLogSerializer
 
     def get_queryset(self):
         qs = ERPSMSLog.objects.all()
         customer_id = self.request.query_params.get('customer')
-        sms_type = self.request.query_params.get('type')
+        sms_type    = self.request.query_params.get('type')
         if customer_id:
             qs = qs.filter(customer_id=customer_id)
         if sms_type:
@@ -1321,13 +1554,13 @@ class ERPSMSLogCreateView(generics.CreateAPIView):
 # =====================================================
 
 class ERPDocumentListView(generics.ListAPIView):
-    """GET /api/erp-documents/ — ?booking=<id>&type=<type>"""
     serializer_class = ERPDocumentSerializer
 
     def get_queryset(self):
+        qs = ERPDocumentSerializer
         qs = ERPDocument.objects.all()
         booking_id = self.request.query_params.get('booking')
-        doc_type = self.request.query_params.get('type')
+        doc_type   = self.request.query_params.get('type')
         if booking_id:
             qs = qs.filter(booking_id=booking_id)
         if doc_type:
@@ -1346,11 +1579,10 @@ class ERPDocumentCreateView(generics.CreateAPIView):
 
 
 # =====================================================
-# 23. COMPANY ASSET (LOGISTICS) VIEWS
+# 23. COMPANY ASSET VIEWS
 # =====================================================
 
 class ERPCompanyAssetListView(generics.ListAPIView):
-    """GET /api/erp-assets/ — ?assigned_to=<user_id>"""
     serializer_class = ERPCompanyAssetSerializer
 
     def get_queryset(self):
@@ -1392,31 +1624,27 @@ class ERPSystemLogCreateView(generics.CreateAPIView):
 @api_view(['GET'])
 def erp_dashboard_summary(request):
     """GET /api/erp-dashboard/ — Admin dashboard summary."""
-    today = date.today()
+    today          = date.today()
     start_of_month = today.replace(day=1)
 
-    total_bookings = ERPBooking.objects.count()
-    active_bookings = ERPBooking.objects.filter(
-        status__in=['pending', 'confirmed', 'agreement_done']
-    ).count()
+    total_bookings    = ERPBooking.objects.count()
+    active_bookings   = ERPBooking.objects.filter(status__in=['pending', 'confirmed', 'agreement_done']).count()
     cancelled_bookings = ERPBooking.objects.filter(status='cancelled').count()
 
     month_receipts = ERPMoneyReceipt.objects.filter(
-        payment_date__gte=start_of_month,
-        status='authorized'
+        payment_date__gte=start_of_month, status='authorized'
     ).aggregate(total=Sum('amount'))['total'] or 0
 
     today_receipts = ERPMoneyReceipt.objects.filter(
-        payment_date=today,
-        status='authorized'
+        payment_date=today, status='authorized'
     ).aggregate(total=Sum('amount'))['total'] or 0
 
     pending_receipts = ERPMoneyReceipt.objects.filter(status='pending').count()
 
-    total_plots = ERPPlot.objects.count()
+    total_plots     = ERPPlot.objects.count()
     available_plots = ERPPlot.objects.filter(status='available').count()
-    booked_plots = ERPPlot.objects.filter(status='booked').count()
-    sold_plots = ERPPlot.objects.filter(status='sold').count()
+    booked_plots    = ERPPlot.objects.filter(status='booked').count()
+    sold_plots      = ERPPlot.objects.filter(status='sold').count()
 
     upcoming_due = ERPInstallmentPlan.objects.filter(
         is_paid=False,
@@ -1424,8 +1652,8 @@ def erp_dashboard_summary(request):
         due_date__gte=today
     ).count()
 
-    total_leads = ERPLead.objects.count()
-    new_leads = ERPLead.objects.filter(status='new').count()
+    total_leads     = ERPLead.objects.count()
+    new_leads       = ERPLead.objects.filter(status='new').count()
     converted_leads = ERPLead.objects.filter(status='converted').count()
 
     total_customers = ERPCustomer.objects.filter(is_active=True).count()
@@ -1447,38 +1675,38 @@ def erp_dashboard_summary(request):
     return Response({
         'today': str(today),
         'bookings': {
-            'total': total_bookings,
-            'active': active_bookings,
+            'total':     total_bookings,
+            'active':    active_bookings,
             'cancelled': cancelled_bookings,
         },
         'revenue': {
-            'today': float(today_receipts),
+            'today':      float(today_receipts),
             'this_month': float(month_receipts),
         },
         'receipts': {
             'pending_approval': pending_receipts,
         },
         'plots': {
-            'total': total_plots,
+            'total':     total_plots,
             'available': available_plots,
-            'booked': booked_plots,
-            'sold': sold_plots,
+            'booked':    booked_plots,
+            'sold':      sold_plots,
         },
         'installments': {
             'due_in_7_days': upcoming_due,
         },
         'leads': {
-            'total': total_leads,
-            'new': new_leads,
+            'total':     total_leads,
+            'new':       new_leads,
             'converted': converted_leads,
         },
         'people': {
-            'customers': total_customers,
-            'investors': total_investors,
+            'customers':          total_customers,
+            'investors':          total_investors,
             'marketing_officers': total_marketing,
         },
         'alerts': {
             'cheque_expiry_warning': cheque_expiry_warning,
-            'token_expiry_soon': token_expiry_soon,
+            'token_expiry_soon':     token_expiry_soon,
         },
     })

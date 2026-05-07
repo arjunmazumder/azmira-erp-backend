@@ -1,5 +1,13 @@
 from django.urls import path
 
+from .views import (
+    CommissionRuleListCreateView,
+    CommissionRuleDetailView,
+    CommissionListView,
+    CommissionDetailView,
+    GenerateCommissionView
+)
+
 from mainapp.views import (
     # 1. User & Auth
     ERPUserListView,
@@ -75,12 +83,14 @@ from mainapp.views import (
     ERPWalletTransactionCreateView,
 
     # 14. Commission
-    ERPCommissionRuleListView,
-    ERPCommissionRuleDetailView,
-    ERPCommissionRuleCreateView,
-    ERPCommissionListView,
-    ERPCommissionDetailView,
-    ERPCommissionCreateView,
+    # ERPCommissionRuleListView,
+    # ERPCommissionRuleDetailView,
+    # ERPCommissionRuleCreateView,
+    # ERPCommissionListView,
+    # ERPCommissionDetailView,
+    # ERPCommissionCreateView,
+    officer_commission_detail,
+    commission_dashboard,
 
     # 15. Loan
     ERPLoanListView,
@@ -270,13 +280,27 @@ urlpatterns = [
     # =====================================================
     # 14. COMMISSION
     # =====================================================
-    path('erp-commission-rules/', ERPCommissionRuleListView.as_view(), name='erp-commission-rule-list'),
-    path('erp-commission-rules/<int:pk>/', ERPCommissionRuleDetailView.as_view(), name='erp-commission-rule-detail'),
-    path('erp-commission-rules/new/', ERPCommissionRuleCreateView.as_view(), name='erp-commission-rule-create'),
+    # path('erp-commission-rules/', ERPCommissionRuleListView.as_view(), name='erp-commission-rule-list'),
+    # path('erp-commission-rules/<int:pk>/', ERPCommissionRuleDetailView.as_view(), name='erp-commission-rule-detail'),
+    # path('erp-commission-rules/new/', ERPCommissionRuleCreateView.as_view(), name='erp-commission-rule-create'),
 
-    path('erp-commissions/', ERPCommissionListView.as_view(), name='erp-commission-list'),
-    path('erp-commissions/<int:pk>/', ERPCommissionDetailView.as_view(), name='erp-commission-detail'),
-    path('erp-commissions/new/', ERPCommissionCreateView.as_view(), name='erp-commission-create'),
+    # path('erp-commissions/', ERPCommissionListView.as_view(), name='erp-commission-list'),
+    # path('erp-commissions/<int:pk>/', ERPCommissionDetailView.as_view(), name='erp-commission-detail'),
+    # path('erp-commissions/new/', ERPCommissionCreateView.as_view(), name='erp-commission-create'),
+
+
+    # Commission Rules
+    path('commission-rules/', CommissionRuleListCreateView.as_view()),
+    path('commission-rules/<int:pk>/', CommissionRuleDetailView.as_view()),
+    # Commissions
+    path('commissions/', CommissionListView.as_view()),
+    path('commissions/<int:pk>/', CommissionDetailView.as_view()),
+    # Trigger Commission
+    path('generate-commission/', GenerateCommissionView.as_view()),
+
+    #from claude 
+    path('commission-dashboard/', commission_dashboard, name='commission-dashboard'),
+    path('commission-dashboard/officer/<int:officer_id>/', officer_commission_detail, name='officer-commission-detail'),
 
     # =====================================================
     # 15. LOAN

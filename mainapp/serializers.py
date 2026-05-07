@@ -13,6 +13,7 @@ from mainapp.models import (
 
 # ===== 1. USER =====
 
+
 class ERPUserSerializer(serializers.ModelSerializer):
     # roles এখন লিস্ট, তাই আমরা ম্যানুয়ালি এটি ডিসপ্লে করার জন্য মেথড লিখব
     role_display = serializers.SerializerMethodField()
@@ -295,9 +296,31 @@ class ERPWalletTransactionSerializer(serializers.ModelSerializer):
 
 # ===== 14. COMMISSION =====
 
-class ERPCommissionRuleSerializer(serializers.ModelSerializer):
-    project_name = serializers.ReadOnlyField(source='project.project_name')
+# class ERPCommissionRuleSerializer(serializers.ModelSerializer):
+#     project_name = serializers.ReadOnlyField(source='project.project_name')
 
+#     class Meta:
+#         model = ERPCommissionRule
+#         fields = '__all__'
+
+
+# class ERPCommissionSerializer(serializers.ModelSerializer):
+#     officer_name = serializers.SerializerMethodField()
+#     booking_code = serializers.ReadOnlyField(source='booking.booking_code')
+#     status_display = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = ERPCommission
+#         fields = '__all__'
+
+#     def get_officer_name(self, obj):
+#         return obj.marketing_officer.user.full_name if obj.marketing_officer else None
+
+#     def get_status_display(self, obj): return obj.get_status_display()
+
+
+
+class ERPCommissionRuleSerializer(serializers.ModelSerializer):
     class Meta:
         model = ERPCommissionRule
         fields = '__all__'
@@ -305,8 +328,6 @@ class ERPCommissionRuleSerializer(serializers.ModelSerializer):
 
 class ERPCommissionSerializer(serializers.ModelSerializer):
     officer_name = serializers.SerializerMethodField()
-    booking_code = serializers.ReadOnlyField(source='booking.booking_code')
-    status_display = serializers.SerializerMethodField()
 
     class Meta:
         model = ERPCommission
@@ -314,8 +335,7 @@ class ERPCommissionSerializer(serializers.ModelSerializer):
 
     def get_officer_name(self, obj):
         return obj.marketing_officer.user.full_name if obj.marketing_officer else None
-
-    def get_status_display(self, obj): return obj.get_status_display()
+    
 
 
 # ===== 15. LOAN =====

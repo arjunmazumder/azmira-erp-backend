@@ -305,7 +305,7 @@ class ERPCustomer(models.Model):
     customer_type = models.CharField(max_length=20, choices=CUSTOMER_TYPE_CHOICES, default='individual')
     source = models.CharField(max_length=30, choices=SOURCE_CHOICES, default='walk_in')
     referred_by = models.ForeignKey(
-        'ERPMarketingOfficer', on_delete=models.SET_NULL,
+        'ERPUser', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='referred_customers'
     )
     loyalty_points = models.IntegerField(default=0)
@@ -874,29 +874,86 @@ class ERPWalletTransaction(models.Model):
 
 
 # =====================================================
-
 # 14. COMMISSION
-
 # =====================================================
 
+# class ERPCommissionRule(models.Model):
+#     id = models.BigAutoField(primary_key=True)
+#     rule_name = models.CharField(max_length=100)
+#     project = models.ForeignKey(ERPProject, on_delete=models.SET_NULL, null=True, blank=True, related_name='commission_rules')
+#     generation = models.IntegerField()
+#     percentage = models.DecimalField(max_digits=5, decimal_places=2)
+#     is_active = models.BooleanField(default=True)
+#     effective_from = models.DateField(default=date.today)
+#     effective_to = models.DateField(blank=True, null=True)
+#     notes = models.TextField(blank=True, null=True, default='')
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     created_by = models.CharField(max_length=100, blank=True, null=True, default='')
+
+#     class Meta:
+#         ordering = ['generation']
+
+#     def __str__(self):
+#         return f'{self.rule_name} - Gen {self.generation} - {self.percentage}%'
+
+
+# class ERPCommission(models.Model):
+#     STATUS_CHOICES = [
+#         ('pending', 'Pending'),
+#         ('approved', 'Approved'),
+#         ('paid', 'Paid'),
+#         ('on_hold', 'On Hold'),
+#     ]
+
+#     id = models.BigAutoField(primary_key=True)
+#     marketing_officer = models.ForeignKey(ERPMarketingOfficer, on_delete=models.CASCADE, related_name='commissions')
+#     booking = models.ForeignKey(ERPBooking, on_delete=models.CASCADE, related_name='commissions')
+#     receipt = models.ForeignKey(ERPMoneyReceipt, on_delete=models.SET_NULL, null=True, blank=True, related_name='commissions')
+#     generation = models.IntegerField(default=1)
+#     commission_rate = models.DecimalField(max_digits=5, decimal_places=2)
+#     base_amount = models.DecimalField(max_digits=12, decimal_places=2)
+#     commission_amount = models.DecimalField(max_digits=12, decimal_places=2)
+#     payment_mode = models.CharField(max_length=30, blank=True, null=True, default='')
+#     is_cash_payment = models.BooleanField(default=True)
+#     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+#     wallet_hit = models.BooleanField(default=False)
+#     wallet_hit_at = models.DateTimeField(blank=True, null=True)
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
+
+#     class Meta:
+#         ordering = ['-created_at']
+
+#     def __str__(self):
+#         return f'Commission - {self.marketing_officer.officer_code} - {self.commission_amount}'
+
+
+
 class ERPCommissionRule(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    rule_name = models.CharField(max_length=100)
-    project = models.ForeignKey(ERPProject, on_delete=models.SET_NULL, null=True, blank=True, related_name='commission_rules')
+    SOURCE_CHOICES = [
+        ('booking', 'Booking Money'),
+        ('installment', 'Installment'),
+        ('down_payment', 'Down Payment'),
+        ('investment', 'Investment'),
+        ('registration', 'Registration'),
+        ('land_dev', 'Land Development'),
+        ('parking', 'Parking'),
+        ('transfer', 'Transfer'),
+        ('utility', 'Utility'),
+    ]
+
+    project = models.ForeignKey('ERPProject', on_delete=models.CASCADE, related_name='commission_rules', null=True, blank=True)
+    source_type = models.CharField(max_length=50, choices=SOURCE_CHOICES, null=True, blank=True)
     generation = models.IntegerField()
-    percentage = models.DecimalField(max_digits=5, decimal_places=2)
+    percentage = models.DecimalField(max_digits=6, decimal_places=3)
     is_active = models.BooleanField(default=True)
-    effective_from = models.DateField(default=date.today)
-    effective_to = models.DateField(blank=True, null=True)
-    notes = models.TextField(blank=True, null=True, default='')
-    created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.CharField(max_length=100, blank=True, null=True, default='')
 
     class Meta:
+        unique_together = ['project', 'source_type', 'generation']
         ordering = ['generation']
 
     def __str__(self):
-        return f'{self.rule_name} - Gen {self.generation} - {self.percentage}%'
+        return f"{self.project} - {self.source_type} - Gen {self.generation}"
 
 
 class ERPCommission(models.Model):
@@ -907,28 +964,26 @@ class ERPCommission(models.Model):
         ('on_hold', 'On Hold'),
     ]
 
-    id = models.BigAutoField(primary_key=True)
-    marketing_officer = models.ForeignKey(ERPMarketingOfficer, on_delete=models.CASCADE, related_name='commissions')
-    booking = models.ForeignKey(ERPBooking, on_delete=models.CASCADE, related_name='commissions')
-    receipt = models.ForeignKey(ERPMoneyReceipt, on_delete=models.SET_NULL, null=True, blank=True, related_name='commissions')
-    generation = models.IntegerField(default=1)
-    commission_rate = models.DecimalField(max_digits=5, decimal_places=2)
+    marketing_officer = models.ForeignKey('ERPMarketingOfficer', on_delete=models.CASCADE, related_name='commissions')
+    booking = models.ForeignKey('ERPBooking', on_delete=models.CASCADE, related_name='commissions')
+
+    source_type = models.CharField(max_length=50, default='utility')
+    generation = models.IntegerField()
+
+    commission_rate = models.DecimalField(max_digits=6, decimal_places=3)
     base_amount = models.DecimalField(max_digits=12, decimal_places=2)
     commission_amount = models.DecimalField(max_digits=12, decimal_places=2)
-    payment_mode = models.CharField(max_length=30, blank=True, null=True, default='')
-    is_cash_payment = models.BooleanField(default=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    wallet_hit = models.BooleanField(default=False)
-    wallet_hit_at = models.DateTimeField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        ordering = ['-created_at']
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+
+    wallet_hit = models.BooleanField(default=False)
+    wallet_hit_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f'Commission - {self.marketing_officer.officer_code} - {self.commission_amount}'
-
+        return f"{self.marketing_officer} - {self.commission_amount}"
+    
 
 # =====================================================
 # 15. LOAN
