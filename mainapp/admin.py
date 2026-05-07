@@ -253,7 +253,7 @@ class ERPLeadAdmin(admin.ModelAdmin):
 class ERPInstallmentPlanInline(admin.TabularInline):
     model = ERPInstallmentPlan
     extra = 0
-    fields = ('installment_number', 'due_date', 'amount', 'paid_amount', 'due_amount', 'is_paid', 'paid_date')
+    fields = ('installment_number', 'due_date', 'amount', 'paid_amount', 'due_amount', 'is_paid',)
     readonly_fields = ('due_amount',)
 
 
@@ -312,7 +312,6 @@ class ERPInstallmentPlanAdmin(admin.ModelAdmin):
         'due_amount', 'is_paid',
         'sms_sent_48h', 'sms_sent_due'
     )
-    list_filter = ('is_paid',)
 
 
 # =====================================================
