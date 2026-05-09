@@ -59,9 +59,9 @@ class ERPUser(models.Model):
     
     department = models.CharField(max_length=50, choices=DEPARTMENT_CHOICES, blank=True, null=True, default='')
     employee_id = models.CharField(max_length=50, blank=True, null=True, default='')
-    is_customer = models.BooleanField(default=False)
-    is_investor = models.BooleanField(default=False)
-    is_marketing = models.BooleanField(default=False)
+    is_customer = models.BooleanField(default=True)
+    is_investor = models.BooleanField(default=True)
+    is_marketing = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
     last_login = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -84,7 +84,7 @@ class ERPUser(models.Model):
                 img_io = BytesIO()
                 img.save(img_io, format='WEBP', quality=80)
                 new_filename = os.path.splitext(self.image.name)[0] + '.webp'
-                self.image.save(new_filename, ContentFile(img_io.getvalue()), save=False)
+                self.image.save(new_filename, ContentFile(img_io.getvalue()), save=True)
             except Exception as e:
                 print('Image conversion failed:', e)
         super().save(*args, **kwargs)
@@ -150,7 +150,7 @@ class ERPProject(models.Model):
                     img_io = BytesIO()
                     img.save(img_io, format='WEBP', quality=80)
                     new_filename = os.path.splitext(field.name)[0] + '.webp'
-                    field.save(new_filename, ContentFile(img_io.getvalue()), save=False)
+                    field.save(new_filename, ContentFile(img_io.getvalue()), save=True)
                 except Exception as e:
                     print(f'Image conversion failed: {e}')
         super().save(*args, **kwargs)
@@ -250,7 +250,7 @@ class ERPLandRecord(models.Model):
     land_status = models.CharField(max_length=30, choices=LAND_STATUS_CHOICES, default='porcha')
     registration_date = models.DateField(blank=True, null=True)
     registration_number = models.CharField(max_length=100, blank=True, null=True, default='')
-    namjari_done = models.BooleanField(default=False)
+    namjari_done = models.BooleanField(default=True)
     namjari_date = models.DateField(blank=True, null=True)
     sub_registry_office = models.CharField(max_length=200, blank=True, null=True, default='')
     notes = models.TextField(blank=True, null=True, default='')
@@ -333,7 +333,7 @@ class ERPCustomer(models.Model):
                     img_io = BytesIO()
                     img.save(img_io, format='WEBP', quality=80)
                     new_filename = os.path.splitext(field.name)[0] + '.webp'
-                    field.save(new_filename, ContentFile(img_io.getvalue()), save=False)
+                    field.save(new_filename, ContentFile(img_io.getvalue()), save=True)
                 except Exception as e:
                     print(f'Image conversion failed: {e}')
         super().save(*args, **kwargs)
@@ -545,11 +545,11 @@ class ERPInstallmentPlan(models.Model):
     paid_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     due_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
-    is_paid = models.BooleanField(default=False)
+    is_paid = models.BooleanField(default=True)
 
     # 🔥 Future-ready SMS tracking (recommended)
-    sms_sent_48h_flag = models.BooleanField(default=False)
-    sms_sent_due_flag = models.BooleanField(default=False)
+    sms_sent_48h_flag = models.BooleanField(default=True)
+    sms_sent_due_flag = models.BooleanField(default=True)
 
     notes = models.TextField(blank=True, null=True, default='')
 
@@ -570,7 +570,7 @@ class ERPInstallmentPlan(models.Model):
         Due date এর 48 ঘন্টা আগে SMS sent condition
         """
         if self.is_paid:
-            return False
+            return True
         return self.due_date == date.today() + timedelta(days=2)
 
     sms_sent_48h.boolean = True
@@ -581,7 +581,7 @@ class ERPInstallmentPlan(models.Model):
         Due date এ SMS sent condition
         """
         if self.is_paid:
-            return False
+            return True
         return self.due_date == date.today()
 
     sms_sent_due.boolean = True
@@ -647,13 +647,13 @@ class ERPMoneyReceipt(models.Model):
     transaction_id = models.CharField(max_length=100, blank=True, null=True, default='')
     # Cheque 30 দিনে cash না হলে জিরো
     cheque_deposit_date = models.DateField(blank=True, null=True)
-    cheque_cleared = models.BooleanField(default=False)
+    cheque_cleared = models.BooleanField(default=True)
     cheque_cleared_date = models.DateField(blank=True, null=True)
-    cheque_notification_sent = models.BooleanField(default=False)
+    cheque_notification_sent = models.BooleanField(default=True)
     # 3-stage: Pending → Complete → Authorized
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    created_by_customer = models.BooleanField(default=False)
-    e_sign = models.BooleanField(default=False)
+    created_by_customer = models.BooleanField(default=True)
+    e_sign = models.BooleanField(default=True)
     e_sign_date = models.DateTimeField(blank=True, null=True)
     completed_by = models.CharField(max_length=100, blank=True, null=True, default='')
     completed_at = models.DateTimeField(blank=True, null=True)
@@ -702,7 +702,7 @@ class ERPVoucher(models.Model):
     debit_head = models.CharField(max_length=200, blank=True, null=True, default='')
     credit_head = models.CharField(max_length=200, blank=True, null=True, default='')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
-    e_sign = models.BooleanField(default=False)
+    e_sign = models.BooleanField(default=True)
     approved_by = models.CharField(max_length=100, blank=True, null=True, default='')
     approved_at = models.DateTimeField(blank=True, null=True)
     created_by = models.CharField(max_length=100, blank=True, null=True, default='')
@@ -744,9 +744,9 @@ class ERPProjectVisit(models.Model):
     confirmed_by = models.CharField(max_length=100, blank=True, null=True, default='')
     confirmed_at = models.DateTimeField(blank=True, null=True)
     outcome = models.TextField(blank=True, null=True, default='')
-    interested = models.BooleanField(default=False)
-    notification_sent_24h = models.BooleanField(default=False)
-    notification_sent_2h = models.BooleanField(default=False)
+    interested = models.BooleanField(default=True)
+    notification_sent_24h = models.BooleanField(default=True)
+    notification_sent_2h = models.BooleanField(default=True)
     notes = models.TextField(blank=True, null=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -862,7 +862,7 @@ class ERPWalletTransaction(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     approved_by = models.CharField(max_length=100, blank=True, null=True, default='')
     approved_at = models.DateTimeField(blank=True, null=True)
-    is_holiday = models.BooleanField(default=False)
+    is_holiday = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.CharField(max_length=100, blank=True, null=True, default='')
 
@@ -916,7 +916,7 @@ class ERPWalletTransaction(models.Model):
 #     payment_mode = models.CharField(max_length=30, blank=True, null=True, default='')
 #     is_cash_payment = models.BooleanField(default=True)
 #     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-#     wallet_hit = models.BooleanField(default=False)
+#     wallet_hit = models.BooleanField(default=True)
 #     wallet_hit_at = models.DateTimeField(blank=True, null=True)
 #     created_at = models.DateTimeField(auto_now_add=True)
 #     updated_at = models.DateTimeField(auto_now=True)
@@ -976,7 +976,7 @@ class ERPCommission(models.Model):
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
 
-    wallet_hit = models.BooleanField(default=False)
+    wallet_hit = models.BooleanField(default=True)
     wallet_hit_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1037,15 +1037,15 @@ class ERPInvestor(models.Model):
     def __str__(self):
         return f'{self.investor_code} - {self.user.full_name}'
     
-@receiver(post_save, sender=ERPInvestor)
-def create_investor_wallet(sender, instance, created, **kwargs):
-    if created:
-        from .models import ERPWallet # Circular import এড়াতে ভেতরে ইমপোর্ট করা ভালো
-        ERPWallet.objects.get_or_create(
-            user=instance.user,
-            wallet_type='investor',
-            defaults={'balance': 0}
-        )
+# @receiver(post_save, sender=ERPInvestor)
+# def create_investor_wallet(sender, instance, created, **kwargs):
+#     if created:
+#         from .models import ERPWallet # Circular import এড়াতে ভেতরে ইমপোর্ট করা ভালো
+#         ERPWallet.objects.get_or_create(
+#             user=instance.user,
+#             wallet_type='investor',
+#             defaults={'balance': 0}
+#         )
 
 
 class ERPInvestment(models.Model):
@@ -1098,7 +1098,7 @@ class ERPDividend(models.Model):
     dividend_rate = models.DecimalField(max_digits=5, decimal_places=2)
     dividend_amount = models.DecimalField(max_digits=12, decimal_places=2)
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='generated')
-    wallet_credited = models.BooleanField(default=False)
+    wallet_credited = models.BooleanField(default=True)
     wallet_credited_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -1154,7 +1154,7 @@ class ERPEmployee(models.Model):
                 img_io = BytesIO()
                 img.save(img_io, format='WEBP', quality=80)
                 new_filename = os.path.splitext(self.profile_image.name)[0] + '.webp'
-                self.profile_image.save(new_filename, ContentFile(img_io.getvalue()), save=False)
+                self.profile_image.save(new_filename, ContentFile(img_io.getvalue()), save=True)
             except Exception as e:
                 print(f'Image conversion failed: {e}')
         super().save(*args, **kwargs)
@@ -1324,7 +1324,7 @@ class ERPOffer(models.Model):
     # ৯০ দিনের বেশি না
     target = models.CharField(max_length=20, choices=TARGET_CHOICES, default='all')
     is_active = models.BooleanField(default=True)
-    sms_sent = models.BooleanField(default=False)
+    sms_sent = models.BooleanField(default=True)
     sms_sent_at = models.DateTimeField(blank=True, null=True)
     created_by = models.CharField(max_length=100, blank=True, null=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1406,8 +1406,8 @@ class ERPDocument(models.Model):
     customer = models.ForeignKey(ERPCustomer, on_delete=models.SET_NULL, null=True, blank=True, related_name='documents')
     file = models.FileField(upload_to='erp/documents/', blank=True, null=True)
     notes = models.TextField(blank=True, null=True, default='')
-    is_signed = models.BooleanField(default=False)
-    e_sign = models.BooleanField(default=False)
+    is_signed = models.BooleanField(default=True)
+    e_sign = models.BooleanField(default=True)
     created_by = models.CharField(max_length=100, blank=True, null=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1441,7 +1441,7 @@ class ERPCompanyAsset(models.Model):
     returned_date = models.DateField(blank=True, null=True)
     condition = models.CharField(max_length=100, blank=True, null=True, default='')
     notes = models.TextField(blank=True, null=True, default='')
-    is_returned = models.BooleanField(default=False)
+    is_returned = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
