@@ -9,6 +9,7 @@ from core.response import success_response, error_response
 from core.models import (
     ClientReview,
     Message,
+    BlogPost
     
 )
 from mainapp.models import(
@@ -82,7 +83,23 @@ class FeaturedERPPlotListView(APIView):
         serializer = FeaturedERPPlotSerializer(featured_properties, many=True)
         return success_response("Featured properties retrieved successfully", serializer.data)
     
-class LatestBlogPostCreateView(APIView):
+
+
+class LatestBlogPostView(APIView):
+    # GET: Fetch all blog posts (Latest first)
+    def get(self, request):
+        # We order by -created_at to get the "Latest" posts first
+        blog_posts = BlogPost.objects.all().order_by('-created_at')
+        serializer = BlogPostSerializer(blog_posts, many=True)
+        
+        # Using your custom success_response utility
+        return success_response(
+            "Blog posts retrieved successfully",
+            serializer.data,
+            status_code=status.HTTP_200_OK
+        )
+
+    # POST: Create a blog post
     def post(self, request):
         serializer = BlogPostSerializer(data=request.data)
         if serializer.is_valid():
@@ -94,6 +111,7 @@ class LatestBlogPostCreateView(APIView):
             )
         return error_response("Failed to create blog post", serializer.errors)
     
+
 class ClientReviewCreateView(APIView):
     # permission_classes = [IsAdminUser]  # Only admin can post reviews
 
