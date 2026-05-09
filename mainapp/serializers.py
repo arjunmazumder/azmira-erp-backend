@@ -131,7 +131,7 @@ class ERPCustomerSerializer(serializers.ModelSerializer):
 
     def get_referred_by(self, obj):
         if obj.referred_by and obj.referred_by.user:
-            return obj.referred_by.user.full_name
+            return obj.referred_by.username
         return None
 
 # ===== 6. LEAD =====
