@@ -130,7 +130,7 @@ class ERPCustomerSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_referred_by(self, obj):
-        if obj.referred_by and obj.referred_by.user:
+        if obj.referred_by and obj.referred_by.username:
             return obj.referred_by.username
         return None
 
