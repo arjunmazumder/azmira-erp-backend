@@ -17,7 +17,7 @@ from django.db.models import Sum
 
 
 # =====================================================
-# 1. USER & AUTHENTICATION (DONE)
+# 1. USER & AUTHENTICATION************(DONE)
 # =====================================================
 
 class ERPUser(models.Model):
@@ -90,7 +90,7 @@ class ERPUser(models.Model):
         super().save(*args, **kwargs)
 
 # =====================================================
-# 2. PROJECT (DONE)
+# 2. PROJECT*************************(DONE)
 # =====================================================
 
 class ERPProject(models.Model):
@@ -157,7 +157,7 @@ class ERPProject(models.Model):
 
 
 # =====================================================
-# 3. PLOT / FLAT / LOT (DONE)
+# 3. PLOT / FLAT / LOT******************(DONE)
 # =====================================================
 
 class ERPPlot(models.Model):
@@ -266,7 +266,7 @@ class ERPLandRecord(models.Model):
 
 
 # =====================================================
-# 5. CUSTOMER (DONE)
+# 5. CUSTOMER********************(DONE)
 # =====================================================
 
 class ERPCustomer(models.Model):
@@ -407,7 +407,7 @@ class ERPLead(models.Model):
 
 
 # =====================================================
-# 7. BOOKING (DONE)
+# 7. BOOKING*********************(DONE)
 # =====================================================
 
 class ERPBooking(models.Model):
@@ -528,7 +528,7 @@ class ERPBooking(models.Model):
 
 
 # =====================================================
-# 8. INSTALLMENT PLAN (DONE)
+# 8. INSTALLMENT PLAN**************(DONE)
 # =====================================================
 
 class ERPInstallmentPlan(models.Model):
@@ -602,7 +602,7 @@ class ERPInstallmentPlan(models.Model):
 
 
 # =====================================================
-# 9. MONEY RECEIPT (DONE)
+# 9. MONEY RECEIPT****************(DONE)
 # =====================================================
 
 class ERPMoneyReceipt(models.Model):
@@ -874,7 +874,7 @@ class ERPWalletTransaction(models.Model):
 
 
 # =====================================================
-# 14. COMMISSION
+# 14. COMMISSION****************(DONE)
 # =====================================================
 
 # class ERPCommissionRule(models.Model):
@@ -1013,7 +1013,7 @@ class ERPLoan(models.Model):
 
 
 # =====================================================
-# 16. INVESTOR (DONE)
+# 16. INVESTOR***************(DONE)
 # =====================================================
 
 class ERPInvestor(models.Model):
@@ -1111,7 +1111,7 @@ class ERPDividend(models.Model):
 
 
 # =====================================================
-# 17. HR
+# 17. HR — EMPLOYEE, ATTENDANCE, PAYROLL
 # =====================================================
 
 class ERPEmployee(models.Model):
