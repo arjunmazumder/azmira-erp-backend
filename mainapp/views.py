@@ -1406,10 +1406,6 @@ class ERPPayrollCreateView(generics.CreateAPIView):
         payroll.save()
         return Response(self.get_serializer(payroll).data, status=status.HTTP_201_CREATED)
 
-
-
-
-
 # =====================================================
 # 18. OFFICER REQUEST VIEWS
 # =====================================================

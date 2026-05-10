@@ -105,9 +105,9 @@ def auto_create_wallet_on_user_save(sender, instance, created, **kwargs):
     বাকি সব        → wallet_type = 'marketing'
     """
     # Customer এর wallet দরকার নেই
-    roles = list(instance.roles) if isinstance(instance.roles, list) else []
-    if roles == ['customer'] or roles == []:
-        return
+    # roles = list(instance.roles) if isinstance(instance.roles, list) else []
+    # if roles == ['customer'] or roles == []:
+    #     return
 
     wallet_type = _determine_wallet_type(instance)
     _get_or_create_wallet_safe(instance, wallet_type)

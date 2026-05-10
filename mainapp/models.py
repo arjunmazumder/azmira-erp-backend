@@ -1072,7 +1072,7 @@ class ERPDividend(models.Model):
 
 
 # =====================================================
-# 17. HR — EMPLOYEE, ATTENDANCE, PAYROLL
+# 17. HR — EMPLOYEE, ATTENDANCE, PAYROLL (DONE)
 # =====================================================
 
 class ERPEmployee(models.Model):
