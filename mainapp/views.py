@@ -181,17 +181,20 @@ class ERPUserByRoleView(generics.ListAPIView):
 # =====================================================
 
 class ERPProjectListView(generics.ListAPIView):
+    permission_classes = [AllowAny]
     queryset = ERPProject.objects.all()
     serializer_class = ERPProjectSerializer
 
 
 class ERPProjectDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [AllowAny]
     queryset = ERPProject.objects.all()
     serializer_class = ERPProjectSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
 
 class ERPProjectCreateView(generics.CreateAPIView):
+    permission_classes = [AllowAny]
     queryset = ERPProject.objects.all()
     serializer_class = ERPProjectSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
@@ -203,6 +206,7 @@ class ERPProjectCreateView(generics.CreateAPIView):
 
 class ERPPlotListView(generics.ListAPIView):
     """GET /api/erp-plots/ — ?project=<id>&status=<status>"""
+    permission_classes = [AllowAny]
     serializer_class = ERPPlotSerializer
 
     def get_queryset(self):
@@ -217,11 +221,13 @@ class ERPPlotListView(generics.ListAPIView):
 
 
 class ERPPlotDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [AllowAny]
     queryset = ERPPlot.objects.all()
     serializer_class = ERPPlotSerializer
 
 
 class ERPPlotCreateView(generics.CreateAPIView):
+    permission_classes = [AllowAny]
     queryset = ERPPlot.objects.all()
     serializer_class = ERPPlotSerializer
 
