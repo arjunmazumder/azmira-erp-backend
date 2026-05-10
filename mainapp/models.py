@@ -84,7 +84,7 @@ class ERPUser(models.Model):
                 img_io = BytesIO()
                 img.save(img_io, format='WEBP', quality=80)
                 new_filename = os.path.splitext(self.image.name)[0] + '.webp'
-                self.image.save(new_filename, ContentFile(img_io.getvalue()), save=True)
+                self.image.save(new_filename, ContentFile(img_io.getvalue()), save=False)
             except Exception as e:
                 print('Image conversion failed:', e)
         super().save(*args, **kwargs)
@@ -150,7 +150,7 @@ class ERPProject(models.Model):
                     img_io = BytesIO()
                     img.save(img_io, format='WEBP', quality=80)
                     new_filename = os.path.splitext(field.name)[0] + '.webp'
-                    field.save(new_filename, ContentFile(img_io.getvalue()), save=True)
+                    field.save(new_filename, ContentFile(img_io.getvalue()), save=False)
                 except Exception as e:
                     print(f'Image conversion failed: {e}')
         super().save(*args, **kwargs)
@@ -356,7 +356,7 @@ class ERPCustomer(models.Model):
                     img_io = BytesIO()
                     img.save(img_io, format='WEBP', quality=80)
                     new_filename = os.path.splitext(field.name)[0] + '.webp'
-                    field.save(new_filename, ContentFile(img_io.getvalue()), save=True)
+                    field.save(new_filename, ContentFile(img_io.getvalue()), save=False)
                 except Exception as e:
                     print(f'Image conversion failed: {e}')
         super().save(*args, **kwargs)
@@ -1008,16 +1008,6 @@ class ERPInvestor(models.Model):
     def __str__(self):
         return f'{self.investor_code} - {self.user.full_name}'
     
-# @receiver(post_save, sender=ERPInvestor)
-# def create_investor_wallet(sender, instance, created, **kwargs):
-#     if created:
-#         from .models import ERPWallet # Circular import এড়াতে ভেতরে ইমপোর্ট করা ভালো
-#         ERPWallet.objects.get_or_create(
-#             user=instance.user,
-#             wallet_type='investor',
-#             defaults={'balance': 0}
-#         )
-
 
 class ERPInvestment(models.Model):
     STATUS_CHOICES = [
@@ -1125,7 +1115,7 @@ class ERPEmployee(models.Model):
                 img_io = BytesIO()
                 img.save(img_io, format='WEBP', quality=80)
                 new_filename = os.path.splitext(self.profile_image.name)[0] + '.webp'
-                self.profile_image.save(new_filename, ContentFile(img_io.getvalue()), save=True)
+                self.profile_image.save(new_filename, ContentFile(img_io.getvalue()), save=False)
             except Exception as e:
                 print(f'Image conversion failed: {e}')
         super().save(*args, **kwargs)
