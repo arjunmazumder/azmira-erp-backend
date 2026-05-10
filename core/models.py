@@ -91,8 +91,9 @@ from django.utils import timezone
 #     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='properties')
 
 #     created_at = models.DateTimeField(auto_now_add=True)
-#     # image = models.ImageField(upload_to='properties/images/', blank=True, null=True)
-#     image = CloudinaryField('image', blank=True, null=True)
+#     image = models.ImageField(upload_to='properties/images/', blank=True, null=True)
+
+#     # image = CloudinaryField('image', blank=True, null=True)
 
 
 #     def __str__(self):

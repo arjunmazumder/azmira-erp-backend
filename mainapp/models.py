@@ -210,6 +210,29 @@ class ERPPlot(models.Model):
     notes = models.TextField(blank=True, null=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    image = models.ImageField(upload_to='properties/images/', blank=True, null=True)
+    total_share = models.CharField(max_length=255, blank=True, null=True)
+    building_type = models.CharField(max_length=255, blank=True, null=True)
+    building_orientation = models.CharField(max_length=255, blank=True, null=True)
+    unit_per_floor = models.CharField(max_length=255, blank=True, null=True)
+    unit_a = models.CharField(max_length=255, blank=True, null=True)
+    unit_b = models.CharField(max_length=255, blank=True, null=True)
+    unit_c = models.CharField(max_length=255, blank=True, null=True)
+    road = models.CharField(max_length=255, blank=True, null=True)
+    bedroom = models.CharField(max_length=255, blank=True, null=True)
+    bathroom = models.CharField(max_length=255, blank=True, null=True)
+    balcony = models.CharField(max_length=255, blank=True, null=True)
+    drawing_dining_room = models.CharField(max_length=255, blank=True, null=True)
+    kitchen = models.CharField(max_length=255, blank=True, null=True)
+    garden = models.CharField(max_length=255, blank=True, null=True)
+    lift = models.CharField(max_length=255, blank=True, null=True)
+    parking = models.CharField(max_length=255, blank=True, null=True)
+    hall = models.CharField(max_length=255, blank=True, null=True)
+    electricity_backup = models.CharField(max_length=255, blank=True, null=True)
+   
+
+    def __str__(self):
+        return f"Specification {self.id}"
 
     class Meta:
         unique_together = [['project', 'plot_number']]

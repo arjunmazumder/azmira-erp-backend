@@ -105,40 +105,144 @@ class ERPProjectAdmin(admin.ModelAdmin):
 # 3. PLOT / FLAT
 # =====================================================
 
+from django.contrib import admin
+from .models import ERPPlot
+
+
 @admin.register(ERPPlot)
 class ERPPlotAdmin(admin.ModelAdmin):
-    list_display = ('id', 'project', 'plot_number', 'plot_type', 'area', 'area_unit', 'final_price', 'status')
-    list_filter = ('project', 'plot_type', 'status', 'facing')
-    search_fields = ('plot_number', 'flat_number', 'project__project_name', 'project__project_code')
+
+    list_display = (
+        'id',
+        'project',
+        'plot_number',
+        'plot_type',
+        'area',
+        'area_unit',
+        'facing',
+        'final_price',
+        'status',
+        'created_at',
+    )
+
+    list_filter = (
+        'project',
+        'plot_type',
+        'status',
+        'facing',
+        'building_orientation',
+        'lift',
+        'parking',
+    )
+
+    search_fields = (
+        'plot_number',
+        'flat_number',
+        'project__project_name',
+        'project__project_code',
+        'building_type',
+        'road',
+        'hall',
+    )
+
     ordering = ('project', 'plot_number')
-    readonly_fields = ('created_at', 'updated_at')
+
+    readonly_fields = (
+        'created_at',
+        'updated_at',
+    )
+
     fieldsets = (
-        ('Plot Info', {
-            'fields': ('project', 'plot_number', 'plot_type', 'status')
+
+        ('Basic Information', {
+            'fields': (
+                'project',
+                'plot_number',
+                'plot_type',
+                'status',
+                'image',
+            )
         }),
-        ('Size', {
-            'fields': ('area', 'area_unit', 'width', 'length', 'facing')
+
+        ('Area & Direction', {
+            'fields': (
+                'area',
+                'area_unit',
+                'width',
+                'length',
+                'facing',
+                'road',
+            )
         }),
-        ('Pricing', {
-            'fields': ('price_per_unit', 'total_price', 'discount_amount', 'final_price')
+
+        ('Pricing Information', {
+            'fields': (
+                'price_per_unit',
+                'total_price',
+                'discount_amount',
+                'final_price',
+            )
         }),
-        ('Flat Info (if applicable)', {
-            'fields': ('floor_number', 'flat_number', 'bedrooms', 'bathrooms'),
+
+        ('Flat / Apartment Information', {
+            'fields': (
+                'floor_number',
+                'flat_number',
+                'bedrooms',
+                'bathrooms',
+            ),
             'classes': ('collapse',)
         }),
+
+        ('Building Specifications', {
+            'fields': (
+                'total_share',
+                'building_type',
+                'building_orientation',
+                'unit_per_floor',
+                'unit_a',
+                'unit_b',
+                'unit_c',
+            ),
+        }),
+
+        ('Room & Facility Information', {
+            'fields': (
+                'bedroom',
+                'bathroom',
+                'balcony',
+                'drawing_dining_room',
+                'kitchen',
+                'garden',
+                'lift',
+                'parking',
+                'hall',
+                'electricity_backup',
+            ),
+        }),
+
         ('Layout Position', {
-            'fields': ('layout_x', 'layout_y'),
+            'fields': (
+                'layout_x',
+                'layout_y',
+            ),
             'classes': ('collapse',)
         }),
-        ('Notes', {
-            'fields': ('notes',)
+
+        ('Additional Notes', {
+            'fields': (
+                'notes',
+            )
         }),
-        ('Audit', {
-            'fields': ('created_at', 'updated_at'),
+
+        ('Audit Information', {
+            'fields': (
+                'created_at',
+                'updated_at',
+            ),
             'classes': ('collapse',)
         }),
     )
-
 
 # =====================================================
 # 4. LAND RECORD
