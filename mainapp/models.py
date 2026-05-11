@@ -20,6 +20,11 @@ from django.db.models import Sum
 # 1. USER & AUTHENTICATION************(DONE)
 # =====================================================
 
+# models.py
+
+from django.db import models
+
+
 class ERPUser(models.Model):
 
     ROLE_CHOICES = [
@@ -46,8 +51,15 @@ class ERPUser(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    username = models.CharField(max_length=150, unique=True)
-    email = models.EmailField(max_length=254, unique=True)
+    username = models.CharField(
+        max_length=150,
+        unique=True
+    )
+
+    email = models.EmailField(
+        max_length=254,
+        unique=True
+    )
 
     password_hash = models.CharField(
         max_length=255,
@@ -56,7 +68,9 @@ class ERPUser(models.Model):
         default=''
     )
 
-    full_name = models.CharField(max_length=200)
+    full_name = models.CharField(
+        max_length=200
+    )
 
     phone = models.CharField(
         max_length=20,
@@ -78,7 +92,10 @@ class ERPUser(models.Model):
         default=''
     )
 
-    date_of_birth = models.DateField(blank=True, null=True)
+    date_of_birth = models.DateField(
+        blank=True,
+        null=True
+    )
 
     image = models.ImageField(
         upload_to='erp/users/',
@@ -87,7 +104,11 @@ class ERPUser(models.Model):
     )
 
     # Multiple roles
-    roles = models.JSONField(default=list, blank=True)
+    roles = models.JSONField(
+        default=list,
+        blank=True,
+        null=True
+    )
 
     department = models.CharField(
         max_length=50,
@@ -104,13 +125,21 @@ class ERPUser(models.Model):
         default=''
     )
 
+    # Default TRUE fields
     is_active = models.BooleanField(default=True)
 
-    last_login = models.DateTimeField(blank=True, null=True)
+    last_login = models.DateTimeField(
+        blank=True,
+        null=True
+    )
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
 
-    updated_at = models.DateTimeField(auto_now=True)
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
 
     created_by = models.CharField(
         max_length=100,
@@ -121,9 +150,14 @@ class ERPUser(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['username']),
+            models.Index(fields=['email']),
+            models.Index(fields=['employee_id']),
+        ]
 
     def __str__(self):
-        return f'{self.username} - {", ".join(self.roles or [])}'
+        return f'{self.username} - {self.id}'
 
     # =====================================================
     # DYNAMIC FLAGS

@@ -14,26 +14,26 @@ from mainapp.models import (
 # ===== 1. USER =====
 
 
-class ERPUserSerializer(serializers.ModelSerializer):
-    # roles এখন লিস্ট, তাই আমরা ম্যানুয়ালি এটি ডিসপ্লে করার জন্য মেথড লিখব
-    role_display = serializers.SerializerMethodField()
-    department_display = serializers.SerializerMethodField()
+# class ERPUserSerializer(serializers.ModelSerializer):
+#     # roles এখন লিস্ট, তাই আমরা ম্যানুয়ালি এটি ডিসপ্লে করার জন্য মেথড লিখব
+#     role_display = serializers.SerializerMethodField()
+#     department_display = serializers.SerializerMethodField()
 
-    class Meta:
-        model = ERPUser
-        fields = '__all__'
-        extra_kwargs = {'password_hash': {'write_only': True}}
+#     class Meta:
+#         model = ERPUser
+#         fields = '__all__'
+#         extra_kwargs = {'password_hash': {'write_only': True}}
 
-    def get_role_display(self, obj):
-        # JSONField/List এর জন্য কাস্টম ডিসপ্লে লজিক
-        if obj.roles:
-            # আন্ডারস্কোর বাদ দিয়ে এবং টাইটেল কেস করে দেখাবে (যেমন: admin -> Admin)
-            return ", ".join([r.replace('_', ' ').title() for r in obj.roles])
-        return "No Role"
+#     def get_role_display(self, obj):
+#         # JSONField/List এর জন্য কাস্টম ডিসপ্লে লজিক
+#         if obj.roles:
+#             # আন্ডারস্কোর বাদ দিয়ে এবং টাইটেল কেস করে দেখাবে (যেমন: admin -> Admin)
+#             return ", ".join([r.replace('_', ' ').title() for r in obj.roles])
+#         return "No Role"
 
-    def get_department_display(self, obj):
-        # Department এখনো ChoiceField তাই এটি কাজ করবে
-        return obj.get_department_display() if obj.department else None
+#     def get_department_display(self, obj):
+#         # Department এখনো ChoiceField তাই এটি কাজ করবে
+#         return obj.get_department_display() if obj.department else None
 
 
 class ERPUserListSerializer(serializers.ModelSerializer):
@@ -50,35 +50,49 @@ class ERPUserListSerializer(serializers.ModelSerializer):
         return "N/A"
 
 
+class ERPUserSerializer(serializers.ModelSerializer):
+    is_customer = serializers.SerializerMethodField()
+    is_investor = serializers.SerializerMethodField()
+    is_marketing = serializers.SerializerMethodField()
+    department_display = serializers.SerializerMethodField()
+    class Meta:
+        model = ERPUser
+        fields = '__all__'
+        extra_kwargs = {'password_hash': {'write_only': True}}
+
+    def get_is_customer(self, obj): return obj.is_customer
+    def get_is_investor(self, obj): return obj.is_investor
+    def get_is_marketing(self, obj): return obj.is_marketing
+    def get_department_display(self, obj):
+        return obj.get_department_display() if obj.department else None
+
 class ERPUserCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
-    is_active = serializers.BooleanField(default=True)
-    
-    # ইনপুট হিসেবে লিস্ট নিবে
     roles = serializers.ListField(
-        child=serializers.CharField(), 
-        required=False, 
+        child=serializers.CharField(),
+        required=False,
         default=list
     )
 
     class Meta:
         model = ERPUser
         fields = [
-            'id', 'username', 'email', 'password', 'full_name', 'phone', 
-            'address', 'nid', 'date_of_birth', 'image', 'roles', 
-            'department', 'employee_id', 'is_customer', 'is_investor', 
-            'is_marketing', 'is_active'
+            'id', 'username', 'email', 'password', 'full_name', 'phone',
+            'address', 'nid', 'date_of_birth', 'image', 'roles',
+            'department', 'employee_id', 'is_active',
+            # is_customer, is_investor, is_marketing বাদ — এগুলো property
         ]
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
-        user = ERPUser.objects.create(**validated_data) 
-        
+        user = ERPUser.objects.create(**validated_data)
         if password:
             user.password_hash = make_password(password)
-            user.save()
-            
+            user.save(update_fields=['password_hash'])
         return user
+    
+
+
 
 # ===== 2. PROJECT =====
 

@@ -244,3 +244,54 @@ def marketing_officer_post_delete(
         instance.user,
         'marketing_manager'
     )
+
+
+@receiver(post_save, sender='mainapp.ERPCustomer')
+def customer_post_save(
+    sender,
+    instance,
+    created,
+    **kwargs
+):
+
+    if instance.user is None:
+        return
+
+    if instance.is_active:
+
+        # Add customer role
+        _add_role(
+            instance.user,
+            'customer'
+        )
+
+        # Optional customer wallet
+        _get_or_create_wallet_safe(
+            instance.user,
+            'customer'
+        )
+
+    else:
+
+        # Remove customer role
+        _remove_role(
+            instance.user,
+            'customer'
+        )
+
+
+@receiver(post_delete, sender='mainapp.ERPCustomer')
+def customer_post_delete(
+    sender,
+    instance,
+    **kwargs
+):
+
+    if instance.user is None:
+        return
+
+    # Remove customer role on delete
+    _remove_role(
+        instance.user,
+        'customer'
+    )
