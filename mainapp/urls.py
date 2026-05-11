@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path,include
 
 from .views import (
     CommissionRuleListCreateView,
@@ -107,6 +107,7 @@ from mainapp.views import (
     ERPDividendListView,
     ERPDividendDetailView,
     ERPDividendCreateView,
+    LandPowerViewSet,
 
     # 17. HR
     ERPEmployeeListView,
@@ -155,13 +156,18 @@ from mainapp.views import (
 
     # Dashboard
     erp_dashboard_summary,
+
 )
 
 # =====================================================
 # REAL ESTATE ERP — URL PATTERNS
 # =====================================================
 
+from rest_framework.routers import DefaultRouter
+router = DefaultRouter()
+router.register(r'land-power', LandPowerViewSet)
 urlpatterns = [
+    path('', include(router.urls)),
 
     # =====================================================
     # 1. USER & AUTH

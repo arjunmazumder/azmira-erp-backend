@@ -8,6 +8,7 @@ from mainapp.models import (
     ERPCommissionRule, ERPCommission, ERPLoan, ERPInvestor, ERPInvestment,
     ERPDividend, ERPEmployee, ERPAttendance, ERPPayroll, ERPOfficerRequest,
     ERPAccountHead, ERPOffer, ERPSMSLog, ERPDocument, ERPCompanyAsset, ERPSystemLog,
+    LandPowerAssignment
 )
 
 
@@ -91,8 +92,6 @@ class ERPUserCreateSerializer(serializers.ModelSerializer):
             user.save(update_fields=['password_hash'])
         return user
     
-
-
 
 # ===== 2. PROJECT =====
 
@@ -402,6 +401,11 @@ class ERPDividendSerializer(serializers.ModelSerializer):
 
     def get_investor_name(self, obj): return obj.investor.user.full_name if obj.investor else None
     def get_status_display(self, obj): return obj.get_status_display()
+
+class LandPowerAssignmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LandPowerAssignment
+        fields = '__all__'
 
 
 # ===== 17. HR =====

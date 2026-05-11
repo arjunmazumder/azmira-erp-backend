@@ -13,6 +13,7 @@ from datetime import datetime, date, timedelta
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db import transaction
 from decimal import Decimal
+from rest_framework import viewsets, filters
 
 from mainapp.models import (
     ERPUser,
@@ -45,6 +46,7 @@ from mainapp.models import (
     ERPDocument,
     ERPCompanyAsset,
     ERPSystemLog,
+    LandPowerAssignment
 )
 
 from .serializers import (
@@ -80,6 +82,7 @@ from .serializers import (
     ERPDocumentSerializer,
     ERPCompanyAssetSerializer,
     ERPSystemLogSerializer,
+    LandPowerAssignmentSerializer
 )
 
 
@@ -1309,6 +1312,11 @@ class ERPDividendCreateView(generics.CreateAPIView):
             return Response({"error": "Investor wallet not found"}, status=404)
         except Exception as e:
             return Response({"error": str(e)}, status=500)
+
+class LandPowerViewSet(viewsets.ModelViewSet):
+    queryset = LandPowerAssignment.objects.all()
+    serializer_class = LandPowerAssignmentSerializer
+
 
 
 # =====================================================

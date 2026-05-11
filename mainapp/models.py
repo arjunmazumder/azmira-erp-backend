@@ -1132,6 +1132,12 @@ class ERPInvestor(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    address = models.TextField()
+    phone_number = models.CharField(max_length=20)
+    email = models.EmailField()
+    nid_number = models.CharField(max_length=50)
+    nominee_details = models.TextField()
+    bank_account_details = models.TextField()
 
     def __str__(self):
         return f'{self.investor_code} - {self.user.full_name}'
@@ -1143,6 +1149,11 @@ class ERPInvestment(models.Model):
         ('matured', 'Matured'),
         ('cancelled', 'Cancelled'),
         ('withdrawn', 'Withdrawn'),
+    ]
+    PAYMENT_METHODS = [
+        ('bank_transfer', 'Bank Transfer'),
+        ('cash', 'Cash'),
+        ('other', 'Other'),
     ]
 
     id = models.BigAutoField(primary_key=True)
@@ -1167,9 +1178,24 @@ class ERPInvestment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    investment_id = models.CharField(max_length=50, unique=True)
+    duration = models.CharField(max_length=50) # e.g., 12 Months
+    terms_conditions = models.TextField(blank=True, null=True)
+    # Status and Returns
+    partial_return_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
+    amount_returned = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
+    dividend_payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS)
+    partial_return_date = models.DateField(blank=True, null=True)
+    full_return_date = models.DateField(blank=True, null=True)
+    # Files and Logs
+    documents = models.FileField(upload_to='investments/docs/', blank=True, null=True)
+    audit_trail = models.JSONField(default=dict) # To track all changes
+    @property
+    def remaining_investment(self):
+        return self.amount - self.amount_returned
+
     def __str__(self):
         return f'{self.investor.investor_code} - {self.invest_amount}'
-
 
 class ERPDividend(models.Model):
     STATUS_CHOICES = [
@@ -1198,6 +1224,32 @@ class ERPDividend(models.Model):
     def __str__(self):
         return f'Dividend - {self.investor.investor_code} - {self.month}/{self.year}'
 
+class LandPowerAssignment(models.Model):
+    TRANSFER_STATUS = [
+        ('pending', 'Pending'),
+        ('transferred', 'Transferred'),
+        ('completed', 'Completed'),
+    ]
+    
+    CANCELLATION_CHOICES = [
+        ('cancel', 'Cancel'),
+        ('retain', 'Retain'),
+    ]
+
+    investment = models.OneToOneField(ERPInvestment, on_delete=models.CASCADE, related_name='land_power')
+    land_power_assigned = models.DecimalField(max_digits=5, decimal_places=2) # Percentage
+    conversion_ratio = models.DecimalField(max_digits=10, decimal_places=2)
+    total_land_assigned = models.DecimalField(max_digits=5, decimal_places=2) # Percentage
+    transfer_status = models.CharField(max_length=20, choices=TRANSFER_STATUS, default='pending')
+    # Cancellation / Return
+    cancellation_status = models.CharField(max_length=10, choices=CANCELLATION_CHOICES, blank=True)
+    return_date = models.DateField(blank=True, null=True)
+    reason_for_cancellation = models.TextField(blank=True, null=True)
+    power_return_status = models.CharField(max_length=20, choices=[('pending', 'Pending'), ('completed', 'Completed')])
+    adjusted_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
+
+    def __str__(self):
+        return f"Land Power for {self.investment.investment_id}"
 
 # =====================================================
 # 17. HR — EMPLOYEE, ATTENDANCE, PAYROLL (DONE)
