@@ -1,13 +1,20 @@
 from rest_framework import serializers
 from core.models import (
     BlogPost, ClientReview,
-    Message
+    Message,
+    PropertySlider
 )
 from mainapp.models import(
     ERPProject,
     ERPPlot
     
 )
+
+
+class PropertySliderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PropertySlider
+        fields = '__all__'
 
 
 # ১. লুপ এড়ানোর জন্য একটি বেসিক প্রজেক্ট সিরিয়ালাইজার

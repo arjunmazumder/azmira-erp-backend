@@ -10,7 +10,9 @@ ClientReviewListView,
 MessageCreateView,
 MessageListAdminView,
 ERPProjectViewSet,
-ERPPlotViewSet
+ERPPlotViewSet,
+PropertySliderListCreateView,
+PropertySliderDetailView
 )
 
 router = DefaultRouter()
@@ -28,5 +30,7 @@ urlpatterns = [
     path('get_client_reviews/', ClientReviewListView.as_view(), name='client-review-list'),
     path('send_message/', MessageCreateView.as_view(), name='send-message'),
     path('get_all_messages/', MessageListAdminView.as_view(), name='admin-message-list'),
+    path('property-slider/',PropertySliderListCreateView.as_view(),name='property-location-list-create'),
+    path('property-slider/<int:pk>/',PropertySliderDetailView.as_view(),name='property-location-detail'),
 
 ]

@@ -21,11 +21,12 @@ from django.db.models import Sum
 # =====================================================
 
 class ERPUser(models.Model):
-    # রোল এবং ডিপার্টমেন্টের চয়েসগুলো (রেফারেন্সের জন্য)
+
     ROLE_CHOICES = [
         ('super_admin', 'Super Admin'),
         ('admin', 'Admin'),
         ('accounts', 'Accounts Officer'),
+        ('employee', 'Employee'),
         ('marketing_officer', 'Marketing Officer'),
         ('marketing_manager', 'Marketing Manager'),
         ('customer_care', 'Customer Care'),
@@ -44,50 +45,143 @@ class ERPUser(models.Model):
     ]
 
     id = models.BigAutoField(primary_key=True)
+
     username = models.CharField(max_length=150, unique=True)
     email = models.EmailField(max_length=254, unique=True)
-    password_hash = models.CharField(max_length=255, blank=True, null=True, default='')
+
+    password_hash = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        default=''
+    )
+
     full_name = models.CharField(max_length=200)
-    phone = models.CharField(max_length=20, blank=True, null=True, default='')
-    address = models.TextField(blank=True, null=True, default='')
-    nid = models.CharField(max_length=50, blank=True, null=True, default='')
+
+    phone = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        default=''
+    )
+
+    address = models.TextField(
+        blank=True,
+        null=True,
+        default=''
+    )
+
+    nid = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        default=''
+    )
+
     date_of_birth = models.DateField(blank=True, null=True)
-    image = models.ImageField(upload_to='erp/users/', blank=True, null=True, default='')
-    
-    # মাল্টিপল রোল রাখার জন্য JSONField
-    roles = models.JSONField(default=list, blank=True) 
-    
-    department = models.CharField(max_length=50, choices=DEPARTMENT_CHOICES, blank=True, null=True, default='')
-    employee_id = models.CharField(max_length=50, blank=True, null=True, default='')
-    is_customer = models.BooleanField(default=True)
-    is_investor = models.BooleanField(default=True)
-    is_marketing = models.BooleanField(default=True)
+
+    image = models.ImageField(
+        upload_to='erp/users/',
+        blank=True,
+        null=True
+    )
+
+    # Multiple roles
+    roles = models.JSONField(default=list, blank=True)
+
+    department = models.CharField(
+        max_length=50,
+        choices=DEPARTMENT_CHOICES,
+        blank=True,
+        null=True,
+        default=''
+    )
+
+    employee_id = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        default=''
+    )
+
     is_active = models.BooleanField(default=True)
+
     last_login = models.DateTimeField(blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
+
     updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.CharField(max_length=100, blank=True, null=True, default='')
+
+    created_by = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        default=''
+    )
 
     class Meta:
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'{self.username} - {", ".join(self.roles)}'
+        return f'{self.username} - {", ".join(self.roles or [])}'
+
+    # =====================================================
+    # DYNAMIC FLAGS
+    # =====================================================
+
+    @property
+    def is_customer(self):
+        return 'customer' in (self.roles or [])
+
+    @property
+    def is_investor(self):
+        return 'investor' in (self.roles or [])
+
+    @property
+    def is_marketing(self):
+        return any(
+            r in (self.roles or [])
+            for r in ['marketing_officer', 'marketing_manager']
+        )
+
+    # =====================================================
+    # IMAGE CONVERSION
+    # =====================================================
 
     def save(self, *args, **kwargs):
-        # ইমেজ কনভারশন লজিক (আগের মতোই)
+
         if self.image and hasattr(self.image, 'file'):
+
             try:
                 img = Image.open(self.image)
+
                 if img.mode in ('RGBA', 'P'):
                     img = img.convert('RGB')
+
                 img_io = BytesIO()
-                img.save(img_io, format='WEBP', quality=80)
-                new_filename = os.path.splitext(self.image.name)[0] + '.webp'
-                self.image.save(new_filename, ContentFile(img_io.getvalue()), save=False)
+
+                img.save(
+                    img_io,
+                    format='WEBP',
+                    quality=80
+                )
+
+                new_filename = (
+                    os.path.splitext(self.image.name)[0]
+                    + '.webp'
+                )
+
+                self.image.save(
+                    new_filename,
+                    ContentFile(img_io.getvalue()),
+                    save=False
+                )
+
             except Exception as e:
                 print('Image conversion failed:', e)
+
         super().save(*args, **kwargs)
+
 
 # =====================================================
 # 2. PROJECT*************************(DONE)

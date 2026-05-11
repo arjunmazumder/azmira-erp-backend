@@ -39,31 +39,88 @@ from mainapp.models import (
 
 @admin.register(ERPUser)
 class ERPUserAdmin(admin.ModelAdmin):
-    list_display = ('id', 'username', 'full_name', 'email', 'roles', 'department', 'is_active', 'created_at')
-    list_filter = ('roles', 'department', 'is_active', 'is_customer', 'is_investor', 'is_marketing')
-    search_fields = ('username', 'full_name', 'email', 'phone', 'nid', 'employee_id')
+
+    list_display = (
+        'id',
+        'username',
+        'full_name',
+        'email',
+        'roles',
+        'department',
+        'is_active',
+        'created_at'
+    )
+
+    # শুধু DB fields রাখুন
+    list_filter = (
+        'roles',
+        'department',
+        'is_active',
+    )
+
+    search_fields = (
+        'username',
+        'full_name',
+        'email',
+        'phone',
+        'nid',
+        'employee_id'
+    )
+
     ordering = ('-created_at',)
-    readonly_fields = ('created_at', 'updated_at', 'last_login')
+
+    readonly_fields = (
+        'created_at',
+        'updated_at',
+        'last_login'
+    )
+
     fieldsets = (
         ('Login Info', {
-            'fields': ('username', 'email', 'password_hash')
+            'fields': (
+                'username',
+                'email',
+                'password_hash'
+            )
         }),
+
         ('Personal Info', {
-            'fields': ('full_name', 'phone', 'address', 'nid', 'date_of_birth', 'image')
+            'fields': (
+                'full_name',
+                'phone',
+                'address',
+                'nid',
+                'date_of_birth',
+                'image'
+            )
         }),
+
         ('Role & Department', {
-            'fields': ('roles', 'department', 'employee_id')
+            'fields': (
+                'roles',
+                'department',
+                'employee_id'
+            )
         }),
-        ('Flags', {
-            'fields': ('is_customer', 'is_investor', 'is_marketing', 'is_active')
+
+        # OPTIONAL: show as read-only info instead of editable fields
+        ('Status Flags (Auto)', {
+            'fields': (
+                'is_active',
+            ),
+            'classes': ('collapse',)
         }),
+
         ('Audit', {
-            'fields': ('created_by', 'created_at', 'updated_at', 'last_login'),
+            'fields': (
+                'created_by',
+                'created_at',
+                'updated_at',
+                'last_login'
+            ),
             'classes': ('collapse',)
         }),
     )
-
-
 # =====================================================
 # 2. PROJECT
 # =====================================================

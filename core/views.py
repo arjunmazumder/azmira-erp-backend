@@ -23,7 +23,25 @@ from core.serializers import(
 from core.filters import (
     ERPPlotFilter,
     ERPProjectFilter
-    )
+)
+
+# views.py
+
+from rest_framework import generics
+from .models import PropertySlider
+from .serializers import PropertySliderSerializer
+
+
+# CREATE + LIST
+class PropertySliderListCreateView(generics.ListCreateAPIView):
+    queryset = PropertySlider.objects.all().order_by('-id')
+    serializer_class = PropertySliderSerializer
+
+
+# RETRIEVE + UPDATE + DELETE
+class PropertySliderDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = PropertySlider.objects.all()
+    serializer_class = PropertySliderSerializer
 
    
 # ২. টাইপ অনুযায়ী প্রজেক্ট পাওয়ার জন্য আলাদা ভিউ
