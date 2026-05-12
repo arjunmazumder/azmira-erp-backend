@@ -1760,7 +1760,6 @@ class ERPSystemLog(models.Model):
 #======================================================
 
 import os
-from django.db import models
 
 
 class ERPSupplier(models.Model):
