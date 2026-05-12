@@ -285,7 +285,7 @@ class ERPProject(models.Model):
 
 
 # =====================================================
-# 3. PLOT / FLAT / LOT******************(DONE)
+# 3. PLOT / FLAT / PLOT******************(DONE)
 # =====================================================
 
 class ERPPlot(models.Model):
