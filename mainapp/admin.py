@@ -20,6 +20,7 @@ from mainapp.models import (
     ERPInvestor,
     ERPInvestment,
     ERPDividend,
+    LandPowerAssignment,
     ERPEmployee,
     ERPAttendance,
     ERPPayroll,
@@ -30,6 +31,7 @@ from mainapp.models import (
     ERPDocument,
     ERPCompanyAsset,
     ERPSystemLog,
+
 )
 
 
@@ -800,6 +802,7 @@ class ERPDividendAdmin(admin.ModelAdmin):
     ordering = ('-year', '-month')
     readonly_fields = ('created_at', 'wallet_credited_at')
 
+admin.site.register(LandPowerAssignment)
 
 # =====================================================
 # 17. HR
@@ -1022,3 +1025,5 @@ class ERPSystemLogAdmin(admin.ModelAdmin):
     search_fields = ('action', 'module', 'description', 'user__full_name', 'ip_address')
     ordering = ('-created_at',)
     readonly_fields = ('created_at',)
+
+
