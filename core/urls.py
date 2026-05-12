@@ -39,5 +39,4 @@ urlpatterns = [
     path('gallary/',GallaryListCreateView.as_view(),name='gallary-list-create'),
     path('gallary/<int:pk>/',GallaryDetailView.as_view(),name='gallary-detail'),
 
-
 ]

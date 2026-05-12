@@ -416,7 +416,7 @@ class LandPowerAssignmentSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-# ===== 17. HR =====
+# ===== 17. HR PayRoll =====
 
 class ERPEmployeeSerializer(serializers.ModelSerializer):
     user_name = serializers.SerializerMethodField()
@@ -556,3 +556,37 @@ class ERPSystemLogSerializer(serializers.ModelSerializer):
 
     def get_user_name(self, obj): return obj.user.full_name if obj.user else None
     def get_log_level_display(self, obj): return obj.get_log_level_display()
+
+
+#======================================================
+# 25.             LAND MANAGEMENT
+#======================================================
+
+
+from mainapp.models import ERPSupplier, ERPLandOwner, ERPLandAcquisition
+
+
+class ERPSupplierSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = ERPSupplier
+        fields = '__all__'
+
+
+class ERPLandOwnerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = ERPLandOwner
+        fields = '__all__'
+
+
+class ERPLandAcquisitionSerializer(serializers.ModelSerializer):
+    supplier_name    = serializers.ReadOnlyField(source='supplier.full_name')
+    supplier_code    = serializers.ReadOnlyField(source='supplier.supplier_code')
+    land_owner_name  = serializers.ReadOnlyField(source='land_owner.full_name')
+    land_status_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = ERPLandAcquisition
+        fields = '__all__'
+
+    def get_land_status_display(self, obj):
+        return obj.get_land_status_display()

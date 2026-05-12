@@ -1733,3 +1733,82 @@ def erp_dashboard_summary(request):
             'token_expiry_soon':     token_expiry_soon,
         },
     })
+
+
+#======================================================
+# 25.             LAND MANAGEMENT
+#======================================================
+
+from rest_framework import generics, status
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
+
+from mainapp.models import ERPSupplier, ERPLandOwner, ERPLandAcquisition
+from mainapp.serializers import (
+    ERPSupplierSerializer,
+    ERPLandOwnerSerializer,
+    ERPLandAcquisitionSerializer,
+)
+from core.filters import ERPLandAcquisitionFilter
+
+
+# ── Supplier ──────────────────────────────────────────────
+class ERPSupplierListView(generics.ListAPIView):
+    queryset         = ERPSupplier.objects.filter(is_active=True)
+    serializer_class = ERPSupplierSerializer
+    filter_backends  = [SearchFilter, OrderingFilter]
+    search_fields    = ['supplier_code', 'full_name', 'phone', 'email']
+    ordering_fields  = ['created_at', 'full_name']
+
+class ERPSupplierCreateView(generics.CreateAPIView):
+    queryset         = ERPSupplier.objects.all()
+    serializer_class = ERPSupplierSerializer
+    parser_classes   = [MultiPartParser, FormParser, JSONParser]
+
+class ERPSupplierDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset         = ERPSupplier.objects.all()
+    serializer_class = ERPSupplierSerializer
+    parser_classes   = [MultiPartParser, FormParser, JSONParser]
+
+
+# ── Land Owner ───────────────────────────────────────────
+class ERPLandOwnerListView(generics.ListAPIView):
+    queryset         = ERPLandOwner.objects.all()
+    serializer_class = ERPLandOwnerSerializer
+    filter_backends  = [SearchFilter]
+    search_fields    = ['full_name', 'nid']
+
+class ERPLandOwnerCreateView(generics.CreateAPIView):
+    queryset         = ERPLandOwner.objects.all()
+    serializer_class = ERPLandOwnerSerializer
+    parser_classes   = [MultiPartParser, FormParser, JSONParser]
+
+class ERPLandOwnerDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset         = ERPLandOwner.objects.all()
+    serializer_class = ERPLandOwnerSerializer
+    parser_classes   = [MultiPartParser, FormParser, JSONParser]
+
+
+# ── Land Acquisition ─────────────────────────────────────
+class ERPLandAcquisitionListView(generics.ListAPIView):
+    queryset         = ERPLandAcquisition.objects.select_related('supplier', 'land_owner')
+    serializer_class = ERPLandAcquisitionSerializer
+    filter_backends  = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class  = ERPLandAcquisitionFilter
+    search_fields    = [
+        'acquisition_code', 'khatiyan_number',
+        'supplier__full_name', 'land_owner__full_name',
+    ]
+    ordering_fields  = ['created_at', 'total_value', 'area_purchased']
+
+class ERPLandAcquisitionCreateView(generics.CreateAPIView):
+    queryset         = ERPLandAcquisition.objects.all()
+    serializer_class = ERPLandAcquisitionSerializer
+    parser_classes   = [MultiPartParser, FormParser, JSONParser]
+
+class ERPLandAcquisitionDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset         = ERPLandAcquisition.objects.select_related('supplier', 'land_owner')
+    serializer_class = ERPLandAcquisitionSerializer
+    parser_classes   = [MultiPartParser, FormParser, JSONParser]

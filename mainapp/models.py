@@ -911,7 +911,7 @@ class ERPProjectVisit(models.Model):
 
 
 # =====================================================
-# 12. MARKETING OFFICER
+# 12. MARKETING OFFICER (DONE)
 # =====================================================
 
 class ERPMarketingOfficer(models.Model):
@@ -952,7 +952,7 @@ class ERPMarketingOfficer(models.Model):
 
 
 # =====================================================
-# 13. WALLET
+# 13. WALLET (DONE)
 # =====================================================
 
 class ERPWallet(models.Model):
@@ -1168,7 +1168,6 @@ class ERPInvestor(models.Model):
         return f'{self.investor_code} - {self.user.full_name}'
     
 
-
 class ERPInvestment(models.Model):
     STATUS_CHOICES = [
         ('active', 'Active'),
@@ -1335,7 +1334,6 @@ class ERPInvestment(models.Model):
     def __str__(self):
         return f'{self.investor} - {self.invest_amount}'
     
-
 
 class ERPDividend(models.Model):
     STATUS_CHOICES = [
@@ -1755,3 +1753,99 @@ class ERPSystemLog(models.Model):
 
     def __str__(self):
         return f'{self.action} - {self.module}'
+
+
+#======================================================
+# 25.             LAND MANAGEMENT
+#======================================================
+
+import os
+from django.db import models
+
+
+class ERPSupplier(models.Model):
+    id                = models.BigAutoField(primary_key=True)
+    supplier_code     = models.CharField(max_length=50, unique=True)   # e.g. ASLY-0001
+    full_name         = models.CharField(max_length=200)
+    phone             = models.CharField(max_length=50, blank=True, null=True, default='')
+    email             = models.EmailField(max_length=150, blank=True, null=True, default='')
+    address           = models.TextField(blank=True, null=True, default='')
+    contract_details  = models.TextField(blank=True, null=True, default='')
+    is_active         = models.BooleanField(default=True)
+    created_at        = models.DateTimeField(auto_now_add=True)
+    updated_at        = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'{self.supplier_code} - {self.full_name}'
+
+
+class ERPLandOwner(models.Model):
+    id                       = models.BigAutoField(primary_key=True)
+    full_name                = models.CharField(max_length=200)
+    nid                      = models.CharField(max_length=50, blank=True, null=True, default='')
+    address                  = models.TextField(blank=True, null=True, default='')
+    power_of_attorney_name   = models.CharField(max_length=200, blank=True, null=True, default='')
+    power_of_attorney_doc    = models.FileField(
+        upload_to='erp/land/attorney/', blank=True, null=True
+    )
+    created_at               = models.DateTimeField(auto_now_add=True)
+    updated_at               = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.full_name
+
+
+class ERPLandAcquisition(models.Model):
+    LAND_STATUS_CHOICES = [
+        ('power_of_attorney', 'Power of Attorney'),
+        ('saf_kabala',        'Saf-Kabala'),
+    ]
+
+    id                  = models.BigAutoField(primary_key=True)
+    acquisition_code    = models.CharField(max_length=50, unique=True)  # e.g. ACL-Land-0001
+    supplier            = models.ForeignKey(
+        ERPSupplier, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='land_acquisitions'
+    )
+    land_owner          = models.ForeignKey(
+        ERPLandOwner, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='land_acquisitions'
+    )
+
+    # Khatiyan info
+    khatiyan_number     = models.CharField(max_length=100, blank=True, null=True, default='')
+
+    # Area & price
+    total_area          = models.DecimalField(max_digits=14, decimal_places=4, default=0)  # Decimal SA,CS,RS,BRS
+    price_per_decimal   = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_value         = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    area_purchased      = models.DecimalField(max_digits=14, decimal_places=4, default=0)
+    amount_paid         = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    outstanding_amount  = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    total_paid          = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+
+    # Status
+    land_status         = models.CharField(
+        max_length=30, choices=LAND_STATUS_CHOICES,
+        default='power_of_attorney'
+    )
+    is_mutated          = models.BooleanField(default=False)   # mutation done?
+    is_surveyed         = models.BooleanField(default=False)   # surveyed?
+
+    # Documents
+    related_documents   = models.FileField(
+        upload_to='erp/land/documents/', blank=True, null=True
+    )
+
+    created_by          = models.CharField(max_length=100, blank=True, null=True, default='')
+    created_at          = models.DateTimeField(auto_now_add=True)
+    updated_at          = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'{self.acquisition_code}'
+
+    def save(self, *args, **kwargs):
+        # Auto-calculate outstanding & total_paid
+        self.outstanding_amount = self.total_value - self.amount_paid
+        self.total_paid         = self.amount_paid
+        super().save(*args, **kwargs)

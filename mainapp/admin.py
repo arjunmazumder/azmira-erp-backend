@@ -31,6 +31,9 @@ from mainapp.models import (
     ERPDocument,
     ERPCompanyAsset,
     ERPSystemLog,
+    ERPSupplier, 
+    ERPLandOwner, 
+    ERPLandAcquisition
 
 )
 
@@ -1025,5 +1028,41 @@ class ERPSystemLogAdmin(admin.ModelAdmin):
     search_fields = ('action', 'module', 'description', 'user__full_name', 'ip_address')
     ordering = ('-created_at',)
     readonly_fields = ('created_at',)
+
+#======================================================
+# 25.             LAND MANAGEMENT
+#======================================================
+
+
+
+@admin.register(ERPSupplier)
+class ERPSupplierAdmin(admin.ModelAdmin):
+    list_display   = ['supplier_code', 'full_name', 'phone', 'email', 'is_active', 'created_at']
+    list_filter    = ['is_active']
+    search_fields  = ['supplier_code', 'full_name', 'phone', 'email']
+    ordering       = ['-created_at']
+
+
+@admin.register(ERPLandOwner)
+class ERPLandOwnerAdmin(admin.ModelAdmin):
+    list_display  = ['full_name', 'nid', 'power_of_attorney_name', 'created_at']
+    search_fields = ['full_name', 'nid']
+    ordering      = ['-created_at']
+
+
+@admin.register(ERPLandAcquisition)
+class ERPLandAcquisitionAdmin(admin.ModelAdmin):
+    list_display = [
+        'acquisition_code', 'supplier', 'land_owner',
+        'total_area', 'total_value', 'amount_paid', 'outstanding_amount',
+        'land_status', 'is_mutated', 'is_surveyed', 'created_at',
+    ]
+    list_filter   = ['land_status', 'is_mutated', 'is_surveyed']
+    search_fields = [
+        'acquisition_code', 'khatiyan_number',
+        'supplier__full_name', 'land_owner__full_name',
+    ]
+    ordering      = ['-created_at']
+    readonly_fields = ['outstanding_amount', 'total_paid', 'created_at', 'updated_at']
 
 

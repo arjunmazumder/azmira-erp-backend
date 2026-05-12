@@ -154,6 +154,13 @@ from mainapp.views import (
     # 24. System Log
     ERPSystemLogListView,
     ERPSystemLogCreateView,
+    
+
+    # 25. Land Management
+
+    ERPSupplierListView, ERPSupplierCreateView, ERPSupplierDetailView,
+    ERPLandOwnerListView, ERPLandOwnerCreateView, ERPLandOwnerDetailView,
+    ERPLandAcquisitionListView, ERPLandAcquisitionCreateView, ERPLandAcquisitionDetailView,
 
     # Dashboard
     erp_dashboard_summary,
@@ -337,16 +344,16 @@ urlpatterns = [
     # 17. HR — EMPLOYEE, ATTENDANCE, PAYROLL
     # =====================================================
     path('erp-employees/', ERPEmployeeListView.as_view(), name='erp-employee-list'),
+    path('erp-employees/new/', ERPEmployeeCreateView.as_view(), name='erp-employee-create'),  # ✅ আগে
     path('erp-employees/<int:pk>/', ERPEmployeeDetailView.as_view(), name='erp-employee-detail'),
-    path('erp-employees/new/', ERPEmployeeCreateView.as_view(), name='erp-employee-create'),
 
     path('erp-attendance/', ERPAttendanceListView.as_view(), name='erp-attendance-list'),
+    path('erp-attendance/new/', ERPAttendanceCreateView.as_view(), name='erp-attendance-create'),  # ✅ আগে
     path('erp-attendance/<int:pk>/', ERPAttendanceDetailView.as_view(), name='erp-attendance-detail'),
-    path('erp-attendance/new/', ERPAttendanceCreateView.as_view(), name='erp-attendance-create'),
 
     path('erp-payroll/', ERPPayrollListView.as_view(), name='erp-payroll-list'),
+    path('erp-payroll/new/', ERPPayrollCreateView.as_view(), name='erp-payroll-create'),  # ✅ আগে
     path('erp-payroll/<int:pk>/', ERPPayrollDetailView.as_view(), name='erp-payroll-detail'),
-    path('erp-payroll/new/', ERPPayrollCreateView.as_view(), name='erp-payroll-create'),
 
     # =====================================================
     # 18. OFFICER REQUEST (TA/DA/Mobile/Commission withdrawal)
@@ -400,6 +407,26 @@ urlpatterns = [
     # =====================================================
     path('erp-system-logs/', ERPSystemLogListView.as_view(), name='erp-system-log-list'),
     path('erp-system-logs/new/', ERPSystemLogCreateView.as_view(), name='erp-system-log-create'),
+
+    #======================================================
+    # 25.             LAND MANAGEMENT
+    #======================================================
+    
+    # Supplier
+    path('erp-suppliers/',          ERPSupplierListView.as_view(),   name='erp-supplier-list'),
+    path('erp-suppliers/new/',      ERPSupplierCreateView.as_view(), name='erp-supplier-create'),
+    path('erp-suppliers/<int:pk>/', ERPSupplierDetailView.as_view(), name='erp-supplier-detail'),
+
+    # Land Owner
+    path('erp-land-owners/',          ERPLandOwnerListView.as_view(),   name='erp-land-owner-list'),
+    path('erp-land-owners/new/',      ERPLandOwnerCreateView.as_view(), name='erp-land-owner-create'),
+    path('erp-land-owners/<int:pk>/', ERPLandOwnerDetailView.as_view(), name='erp-land-owner-detail'),
+
+    # Land Acquisition
+    path('erp-land/',          ERPLandAcquisitionListView.as_view(),   name='erp-land-list'),
+    path('erp-land/new/',      ERPLandAcquisitionCreateView.as_view(), name='erp-land-create'),
+    path('erp-land/<int:pk>/', ERPLandAcquisitionDetailView.as_view(), name='erp-land-detail'),
+
 
     # =====================================================
     # DASHBOARD SUMMARY
