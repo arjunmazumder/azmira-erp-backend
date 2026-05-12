@@ -6,6 +6,19 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from core.response import success_response, error_response
+from django.shortcuts import get_object_or_404
+
+class BlogPostDetailView(APIView):
+
+    def get(self, request, pk):
+        blog_post = get_object_or_404(BlogPost, pk=pk)
+        serializer = BlogPostSerializer(blog_post)
+
+        return success_response(
+            "Blog post retrieved successfully",
+            serializer.data,
+            status_code=status.HTTP_200_OK
+        )
 from core.models import (
     ClientReview,
     Message,
@@ -142,6 +155,20 @@ class LatestBlogPostView(APIView):
                 status_code=status.HTTP_201_CREATED
             )
         return error_response("Failed to create blog post", serializer.errors)
+    
+
+
+class BlogPostDetailView(APIView):
+
+    def get(self, request, pk):
+        blog_post = get_object_or_404(BlogPost, pk=pk)
+        serializer = BlogPostSerializer(blog_post)
+
+        return success_response(
+            "Blog post retrieved successfully",
+            serializer.data,
+            status_code=status.HTTP_200_OK
+        )
     
 
 class ClientReviewCreateView(APIView):
