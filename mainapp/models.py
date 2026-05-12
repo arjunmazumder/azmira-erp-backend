@@ -1143,6 +1143,11 @@ class ERPInvestor(models.Model):
         return f'{self.investor_code} - {self.user.full_name}'
     
 
+import uuid
+from datetime import date
+from django.db import models
+
+
 class ERPInvestment(models.Model):
     STATUS_CHOICES = [
         ('active', 'Active'),
@@ -1150,6 +1155,7 @@ class ERPInvestment(models.Model):
         ('cancelled', 'Cancelled'),
         ('withdrawn', 'Withdrawn'),
     ]
+
     PAYMENT_METHODS = [
         ('bank_transfer', 'Bank Transfer'),
         ('cash', 'Cash'),
@@ -1157,45 +1163,158 @@ class ERPInvestment(models.Model):
     ]
 
     id = models.BigAutoField(primary_key=True)
-    investor = models.ForeignKey(ERPInvestor, on_delete=models.CASCADE, related_name='investments')
-    project = models.ForeignKey(ERPProject, on_delete=models.SET_NULL, null=True, blank=True, related_name='investments')
-    invest_amount = models.DecimalField(max_digits=16, decimal_places=2)
-    invest_date = models.DateField(default=date.today)
-    maturity_date = models.DateField(blank=True, null=True)
-    monthly_dividend_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    total_profit_received = models.DecimalField(max_digits=16, decimal_places=2, default=0)
-    agreement_number = models.CharField(max_length=100, blank=True, null=True, default='')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
-    cancellation_date = models.DateField(blank=True, null=True)
-    cancellation_note = models.TextField(blank=True, null=True, default='')
-    transferred_to_project = models.ForeignKey(
-        ERPProject, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='transferred_investments'
+
+    investor = models.ForeignKey(
+        'ERPInvestor',
+        on_delete=models.CASCADE,
+        related_name='investments'
     )
-    transfer_date = models.DateField(blank=True, null=True)
-    transfer_service_charge = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    notes = models.TextField(blank=True, null=True, default='')
+
+    project = models.ForeignKey(
+        'ERPProject',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='investments'
+    )
+
+    invest_amount = models.DecimalField(
+        max_digits=16,
+        decimal_places=2
+    )
+
+    invest_date = models.DateField(default=date.today)
+
+    maturity_date = models.DateField(
+        blank=True,
+        null=True
+    )
+
+    monthly_dividend_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0
+    )
+
+    total_profit_received = models.DecimalField(
+        max_digits=16,
+        decimal_places=2,
+        default=0
+    )
+
+    agreement_number = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        default=''
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='active'
+    )
+
+    cancellation_date = models.DateField(
+        blank=True,
+        null=True
+    )
+
+    cancellation_note = models.TextField(
+        blank=True,
+        null=True,
+        default=''
+    )
+
+    transferred_to_project = models.ForeignKey(
+        'ERPProject',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='transferred_investments'
+    )
+
+    transfer_date = models.DateField(
+        blank=True,
+        null=True
+    )
+
+    transfer_service_charge = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0
+    )
+
+    notes = models.TextField(
+        blank=True,
+        null=True,
+        default=''
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    investment_id = models.CharField(max_length=50, unique=True)
-    duration = models.CharField(max_length=50) # e.g., 12 Months
-    terms_conditions = models.TextField(blank=True, null=True)
-    # Status and Returns
-    partial_return_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
-    amount_returned = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
-    dividend_payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS)
-    partial_return_date = models.DateField(blank=True, null=True)
-    full_return_date = models.DateField(blank=True, null=True)
-    # Files and Logs
-    documents = models.FileField(upload_to='investments/docs/', blank=True, null=True)
-    audit_trail = models.JSONField(default=dict) # To track all changes
+    investment_id = models.CharField(
+    max_length=50,
+    unique=True,
+    blank=True,
+    null=True
+    )
+
+    duration = models.CharField(
+        max_length=50,
+        default='12 Months'
+    )
+
+    terms_conditions = models.TextField(
+        blank=True,
+        null=True
+    )
+
+    partial_return_amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0.00
+    )
+
+    amount_returned = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0.00
+    )
+
+    dividend_payment_method = models.CharField(
+        max_length=20,
+        choices=PAYMENT_METHODS,
+        default='bank_transfer'
+    )
+
+    partial_return_date = models.DateField(
+        blank=True,
+        null=True
+    )
+
+    full_return_date = models.DateField(
+        blank=True,
+        null=True
+    )
+
+    documents = models.FileField(
+        upload_to='investments/docs/',
+        blank=True,
+        null=True
+    )
+
+    audit_trail = models.JSONField(default=dict)
+
     @property
     def remaining_investment(self):
-        return self.amount - self.amount_returned
+        return self.invest_amount - self.amount_returned
 
     def __str__(self):
-        return f'{self.investor.investor_code} - {self.invest_amount}'
+        return f'{self.investor} - {self.invest_amount}'
+    
+
 
 class ERPDividend(models.Model):
     STATUS_CHOICES = [
