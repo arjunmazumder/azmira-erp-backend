@@ -14,6 +14,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.db import transaction
 from decimal import Decimal
 from rest_framework import viewsets, filters
+from rest_framework.generics import ListAPIView
 
 from mainapp.models import (
     ERPUser,
@@ -49,12 +50,13 @@ from mainapp.models import (
     LandPowerAssignment
 )
 
-from .serializers import (
+from mainapp.serializers import (
     ERPUserSerializer,
     ERPUserCreateSerializer,
     ERPUserListSerializer,
     ERPProjectSerializer,
     ERPPlotSerializer,
+    FeaturedPlotSerializer,
     ERPLandRecordSerializer,
     ERPCustomerSerializer,
     ERPLeadSerializer,
@@ -234,6 +236,14 @@ class ERPPlotCreateView(generics.CreateAPIView):
     queryset = ERPPlot.objects.all()
     serializer_class = ERPPlotSerializer
 
+class FeaturedPlotListAPIView(ListAPIView):
+    serializer_class = FeaturedPlotSerializer
+
+    def get_queryset(self):
+        return ERPPlot.objects.filter(
+            is_featured=True
+        ).order_by('-id')
+    
 
 # =====================================================
 # 4. LAND RECORD VIEWS

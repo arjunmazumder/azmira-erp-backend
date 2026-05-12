@@ -9,7 +9,8 @@ from core.response import success_response, error_response
 from core.models import (
     ClientReview,
     Message,
-    BlogPost
+    BlogPost,
+    Gallary
     
 )
 from mainapp.models import(
@@ -18,7 +19,8 @@ from mainapp.models import(
 
 from core.serializers import(
     ERPProjectSerializer, ERPPlotSerializer, FeaturedERPPlotSerializer,
-    BlogPostSerializer, ClientReviewSerializer,MessageSerializer
+    BlogPostSerializer, ClientReviewSerializer,MessageSerializer,
+    GallarySerializer
 ) 
 from core.filters import (
     ERPPlotFilter,
@@ -42,6 +44,18 @@ class PropertySliderListCreateView(generics.ListCreateAPIView):
 class PropertySliderDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = PropertySlider.objects.all()
     serializer_class = PropertySliderSerializer
+
+
+# CREATE + LIST
+class GallaryListCreateView(generics.ListCreateAPIView):
+    queryset = Gallary.objects.all().order_by('-id')
+    serializer_class = GallarySerializer
+
+
+# RETRIEVE + UPDATE + DELETE
+class GallaryDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Gallary.objects.all()
+    serializer_class = GallarySerializer
 
    
 # ২. টাইপ অনুযায়ী প্রজেক্ট পাওয়ার জন্য আলাদা ভিউ

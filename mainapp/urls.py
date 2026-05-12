@@ -25,6 +25,7 @@ from mainapp.views import (
     ERPPlotListView,
     ERPPlotDetailView,
     ERPPlotCreateView,
+    FeaturedPlotListAPIView,
 
     # 4. Land Record
     ERPLandRecordListView,
@@ -192,6 +193,7 @@ urlpatterns = [
     path('erp-plots/', ERPPlotListView.as_view(), name='erp-plot-list'),
     path('erp-plots/<int:pk>/', ERPPlotDetailView.as_view(), name='erp-plot-detail'),
     path('erp-plots/new/', ERPPlotCreateView.as_view(), name='erp-plot-create'),
+    path('featured-plots/',FeaturedPlotListAPIView.as_view(),name='featured-plots'),
 
     # =====================================================
     # 4. LAND RECORD

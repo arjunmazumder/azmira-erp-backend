@@ -2,7 +2,8 @@ from rest_framework import serializers
 from core.models import (
     BlogPost, ClientReview,
     Message,
-    PropertySlider
+    PropertySlider,
+    Gallary
 )
 from mainapp.models import(
     ERPProject,
@@ -14,6 +15,11 @@ from mainapp.models import(
 class PropertySliderSerializer(serializers.ModelSerializer):
     class Meta:
         model = PropertySlider
+        fields = '__all__'
+
+class GallarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Gallary
         fields = '__all__'
 
 

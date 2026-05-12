@@ -12,7 +12,9 @@ MessageListAdminView,
 ERPProjectViewSet,
 ERPPlotViewSet,
 PropertySliderListCreateView,
-PropertySliderDetailView
+PropertySliderDetailView,
+GallaryListCreateView,
+GallaryDetailView
 )
 
 router = DefaultRouter()
@@ -32,5 +34,8 @@ urlpatterns = [
     path('get_all_messages/', MessageListAdminView.as_view(), name='admin-message-list'),
     path('property-slider/',PropertySliderListCreateView.as_view(),name='property-location-list-create'),
     path('property-slider/<int:pk>/',PropertySliderDetailView.as_view(),name='property-location-detail'),
+    path('gallary/',GallaryListCreateView.as_view(),name='gallary-list-create'),
+    path('gallary/<int:pk>/',GallaryDetailView.as_view(),name='gallary-detail'),
+
 
 ]

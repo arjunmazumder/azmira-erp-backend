@@ -357,6 +357,7 @@ class ERPPlot(models.Model):
     parking = models.CharField(max_length=255, blank=True, null=True)
     hall = models.CharField(max_length=255, blank=True, null=True)
     electricity_backup = models.CharField(max_length=255, blank=True, null=True)
+    is_featured = models.BooleanField(default=False)
    
 
     def __str__(self):
@@ -1132,20 +1133,40 @@ class ERPInvestor(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    address = models.TextField()
-    phone_number = models.CharField(max_length=20)
-    email = models.EmailField()
-    nid_number = models.CharField(max_length=50)
-    nominee_details = models.TextField()
-    bank_account_details = models.TextField()
+    address = models.TextField(
+    blank=True,
+    null=True,
+    default=''
+    )
+    phone_number = models.CharField(
+    max_length=255,
+    blank=True,
+    null=True
+    )
+    email = models.EmailField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
+    nid_number = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
+    nominee_details = models.TextField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
+    bank_account_details = models.TextField(
+        blank=True,
+        null=True,
+        default=''
+    )
 
     def __str__(self):
         return f'{self.investor_code} - {self.user.full_name}'
     
-
-import uuid
-from datetime import date
-from django.db import models
 
 
 class ERPInvestment(models.Model):

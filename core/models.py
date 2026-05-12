@@ -113,6 +113,18 @@ class PropertySlider(models.Model):
 
     def __str__(self):
         return self.title
+    
+class Gallary(models.Model):
+    title = models.CharField(max_length=255)
+    location = models.CharField(max_length=500)
+    image = models.ImageField(upload_to='gallary_locations/')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.title
+
 
 #Blog Post
 

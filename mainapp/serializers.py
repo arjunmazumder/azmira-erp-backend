@@ -121,6 +121,14 @@ class ERPPlotSerializer(serializers.ModelSerializer):
     def get_status_display(self, obj): return obj.get_status_display()
 
 
+
+class FeaturedPlotSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ERPPlot
+        fields = '__all__'
+
+
 # ===== 4. LAND RECORD =====
 
 class ERPLandRecordSerializer(serializers.ModelSerializer):
