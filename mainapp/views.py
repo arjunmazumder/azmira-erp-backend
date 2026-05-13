@@ -47,7 +47,10 @@ from mainapp.models import (
     ERPDocument,
     ERPCompanyAsset,
     ERPSystemLog,
-    LandPowerAssignment
+    LandPowerAssignment,
+    ERPSupplier, 
+    ERPLandOwner, 
+    ERPLandAcquisition
 )
 
 from mainapp.serializers import (
@@ -84,8 +87,19 @@ from mainapp.serializers import (
     ERPDocumentSerializer,
     ERPCompanyAssetSerializer,
     ERPSystemLogSerializer,
-    LandPowerAssignmentSerializer
+    LandPowerAssignmentSerializer,
+    ERPSupplierSerializer,
+    ERPLandOwnerSerializer,
+    ERPLandAcquisitionSerializer,
 )
+
+from rest_framework import generics, status
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
+
+from core.filters import ERPLandAcquisitionFilter
 
 
 # =====================================================
@@ -1842,19 +1856,7 @@ def erp_dashboard_summary(request):
 # 25.             LAND MANAGEMENT
 #======================================================
 
-from rest_framework import generics, status
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from rest_framework.response import Response
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.filters import SearchFilter, OrderingFilter
 
-from mainapp.models import ERPSupplier, ERPLandOwner, ERPLandAcquisition
-from mainapp.serializers import (
-    ERPSupplierSerializer,
-    ERPLandOwnerSerializer,
-    ERPLandAcquisitionSerializer,
-)
-from core.filters import ERPLandAcquisitionFilter
 
 
 # ── Supplier ──────────────────────────────────────────────
