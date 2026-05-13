@@ -1704,10 +1704,10 @@ class ERPDocument(models.Model):
 
 class ERPCompanyAsset(models.Model):
     ASSET_TYPE_CHOICES = [
-        ('project', 'Project'),
-        ('lot', 'Lot'),
-        ('Plot', 'Plot'),
-        ('both', 'Both'),
+        ('mobile', 'Mobile Phone'),
+        ('sim', 'SIM Card'),
+        ('vehicle', 'Vehicle'),
+        ('laptop', 'Laptop'),
         ('other', 'Other'),
     ]
 
@@ -1756,7 +1756,7 @@ class ERPSystemLog(models.Model):
 
 
 #======================================================
-# 25.             LAND MANAGEMENT (DONE)
+# 25.             LAND MANAGEMENT (DO)
 #======================================================
 
 import os
