@@ -241,6 +241,7 @@ class ERPMoneyReceiptSerializer(serializers.ModelSerializer):
 
 class ERPVoucherSerializer(serializers.ModelSerializer):
     # ✅ null check সহ
+    voucher_number = serializers.CharField(required=False, read_only=True)
     customer_name = serializers.SerializerMethodField()
     booking_code = serializers.SerializerMethodField()
     voucher_type_display = serializers.SerializerMethodField()
