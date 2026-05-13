@@ -372,7 +372,7 @@ class ERPPlot(models.Model):
 
 
 # =====================================================
-# 4. LAND RECORD 
+# 4. LAND RECORD (DONE)
 # =====================================================
 
 class ERPLandRecord(models.Model):
@@ -492,7 +492,7 @@ class ERPCustomer(models.Model):
 
 
 # =====================================================
-# 6. LEAD MANAGEMENT 
+# 6. LEAD MANAGEMENT (Done)
 # =====================================================
 
 class ERPLead(models.Model):
@@ -827,7 +827,6 @@ class ERPMoneyReceipt(models.Model):
 # =====================================================
 # 10. VOUCHER
 # =====================================================
-
 class ERPVoucher(models.Model):
     VOUCHER_TYPE_CHOICES = [
         ('debit', 'Debit Voucher'),
@@ -849,15 +848,35 @@ class ERPVoucher(models.Model):
     entry_date = models.DateField(default=date.today)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     description = models.TextField(blank=True, null=True, default='')
-    booking = models.ForeignKey(ERPBooking, on_delete=models.SET_NULL, null=True, blank=True, related_name='vouchers')
-    customer = models.ForeignKey(ERPCustomer, on_delete=models.SET_NULL, null=True, blank=True, related_name='vouchers')
-    debit_head = models.CharField(max_length=200, blank=True, null=True, default='')
-    credit_head = models.CharField(max_length=200, blank=True, null=True, default='')
+    booking = models.ForeignKey(
+        ERPBooking, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='vouchers'
+    )
+    customer = models.ForeignKey(
+        ERPCustomer, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='vouchers'
+    )
+    debit_head = models.ForeignKey(
+        "ERPAccountHead", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='debit_vouchers'
+    )
+    credit_head = models.ForeignKey(
+       "ERPAccountHead", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='credit_vouchers'
+    )
+
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
-    e_sign = models.BooleanField(default=True)
-    approved_by = models.CharField(max_length=100, blank=True, null=True, default='')
+    e_sign = models.BooleanField(default=False)
+
+    approved_by = models.ForeignKey(
+        ERPUser, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='approved_vouchers'
+    )
     approved_at = models.DateTimeField(blank=True, null=True)
-    created_by = models.CharField(max_length=100, blank=True, null=True, default='')
+    created_by = models.ForeignKey(
+        ERPUser, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='created_vouchers'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -866,7 +885,7 @@ class ERPVoucher(models.Model):
 
     def __str__(self):
         return f'{self.voucher_number} - {self.voucher_type}'
-
+    
 
 # =====================================================
 # 11. PROJECT VISIT
@@ -1544,7 +1563,7 @@ class ERPOfficerRequest(models.Model):
 
 
 # =====================================================
-# 19. ACCOUNT HEAD
+# 19. ACCOUNT HEAD (DONE)
 # =====================================================
 
 class ERPAccountHead(models.Model):
@@ -1571,7 +1590,7 @@ class ERPAccountHead(models.Model):
 
 
 # =====================================================
-# 20. OFFER & DISCOUNT PORTAL
+# 20. OFFER & DISCOUNT PORTAL (DONE)
 # =====================================================
 
 class ERPOffer(models.Model):
@@ -1605,7 +1624,7 @@ class ERPOffer(models.Model):
     is_active = models.BooleanField(default=True)
     sms_sent = models.BooleanField(default=True)
     sms_sent_at = models.DateTimeField(blank=True, null=True)
-    created_by = models.CharField(max_length=100, blank=True, null=True, default='')
+    # created_by = models.CharField(max_length=100, blank=True, null=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1699,7 +1718,7 @@ class ERPDocument(models.Model):
 
 
 # =====================================================
-# 23. COMPANY ASSET (Logistics)
+# 23. COMPANY ASSET (Logistics) (DONE)
 # =====================================================
 
 class ERPCompanyAsset(models.Model):

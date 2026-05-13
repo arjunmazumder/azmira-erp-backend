@@ -238,18 +238,53 @@ class ERPMoneyReceiptSerializer(serializers.ModelSerializer):
 
 # ===== 10. VOUCHER =====
 
+
 class ERPVoucherSerializer(serializers.ModelSerializer):
-    customer_name = serializers.ReadOnlyField(source='customer.full_name')
-    booking_code = serializers.ReadOnlyField(source='booking.booking_code')
+    # ✅ null check সহ
+    customer_name = serializers.SerializerMethodField()
+    booking_code = serializers.SerializerMethodField()
     voucher_type_display = serializers.SerializerMethodField()
     status_display = serializers.SerializerMethodField()
+
+    # ✅ FK এর display name
+    debit_head_name = serializers.SerializerMethodField()
+    credit_head_name = serializers.SerializerMethodField()
+    approved_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = ERPVoucher
         fields = '__all__'
 
-    def get_voucher_type_display(self, obj): return obj.get_voucher_type_display()
-    def get_status_display(self, obj): return obj.get_status_display()
+    def get_customer_name(self, obj):
+        return obj.customer.full_name if obj.customer else None
+
+    def get_booking_code(self, obj):
+        return obj.booking.booking_code if obj.booking else None
+
+    def get_voucher_type_display(self, obj):
+        return obj.get_voucher_type_display()
+
+    def get_status_display(self, obj):
+        return obj.get_status_display()
+
+    def get_debit_head_name(self, obj):
+        return obj.debit_head.account_name if obj.debit_head else None
+
+    def get_credit_head_name(self, obj):
+        return obj.credit_head.account_name if obj.credit_head else None
+
+    def get_approved_by_name(self, obj):
+        return obj.approved_by.full_name if obj.approved_by else None
+
+    # ✅ approved voucher edit করা যাবে না
+    def validate(self, data):
+        if self.instance and self.instance.status == 'approved':
+            raise serializers.ValidationError(
+                'Approved voucher cannot be edited.'
+            )
+        return data
+    
+
 
 
 # ===== 11. PROJECT VISIT =====

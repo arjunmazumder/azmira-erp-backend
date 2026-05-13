@@ -594,25 +594,128 @@ class ERPMoneyReceiptDownloadView(generics.RetrieveAPIView):
 # =====================================================
 
 class ERPVoucherListView(generics.ListAPIView):
-    """GET /api/erp-vouchers/ — ?type=debit|credit|journal|contra"""
     serializer_class = ERPVoucherSerializer
 
     def get_queryset(self):
-        qs = ERPVoucher.objects.all()
-        v_type = self.request.query_params.get('type')
+        # ✅ select_related — N+1 fix
+        qs = ERPVoucher.objects.select_related(
+            'customer',
+            'booking',
+            'debit_head',
+            'credit_head',
+            'approved_by',
+            'created_by'
+        ).all()
+
+        v_type  = self.request.query_params.get('type')
+        status  = self.request.query_params.get('status')
+        customer_id = self.request.query_params.get('customer')
+        booking_id  = self.request.query_params.get('booking')
+
         if v_type:
             qs = qs.filter(voucher_type=v_type)
+        if status:
+            qs = qs.filter(status=status)
+        if customer_id:
+            qs = qs.filter(customer_id=customer_id)
+        if booking_id:
+            qs = qs.filter(booking_id=booking_id)
+
         return qs
 
 
 class ERPVoucherDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = ERPVoucher.objects.all()
     serializer_class = ERPVoucherSerializer
+
+    def get_queryset(self):
+        return ERPVoucher.objects.select_related(
+            'customer', 'booking',
+            'debit_head', 'credit_head',
+            'approved_by', 'created_by'
+        )
+
+    # ✅ approved voucher delete করা যাবে না
+    def destroy(self, request, *args, **kwargs):
+        voucher = self.get_object()
+        if voucher.status == 'approved':
+            return Response(
+                {'error': 'Approved voucher cannot be deleted.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().destroy(request, *args, **kwargs)
 
 
 class ERPVoucherCreateView(generics.CreateAPIView):
-    queryset = ERPVoucher.objects.all()
     serializer_class = ERPVoucherSerializer
+
+    def get_queryset(self):
+        return ERPVoucher.objects.select_related(
+            'customer', 'booking',
+            'debit_head', 'credit_head',
+            'approved_by', 'created_by'
+        )
+
+    # ✅ voucher_number auto-generate
+    def perform_create(self, serializer):
+        year = date.today().year
+        last = ERPVoucher.objects.filter(
+            voucher_number__startswith=f'VCH-{year}-'
+        ).count()
+        voucher_number = f'VCH-{year}-{str(last + 1).zfill(4)}'
+        serializer.save(voucher_number=voucher_number)
+
+
+# ✅ Approve / Reject এর আলাদা endpoint
+class ERPVoucherApproveView(generics.UpdateAPIView):
+    serializer_class = ERPVoucherSerializer
+    http_method_names = ['patch']
+
+    def get_queryset(self):
+        return ERPVoucher.objects.all()
+
+    def patch(self, request, *args, **kwargs):
+        voucher = self.get_object()
+
+        if voucher.status != 'draft':
+            return Response(
+                {'error': f'Only draft vouchers can be approved. Current status: {voucher.status}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        voucher.status = 'approved'
+        voucher.approved_by_id = request.data.get('approved_by')
+        voucher.approved_at = date.today()
+        voucher.save()
+
+        return Response(
+            ERPVoucherSerializer(voucher).data,
+            status=status.HTTP_200_OK
+        )
+
+
+class ERPVoucherRejectView(generics.UpdateAPIView):
+    serializer_class = ERPVoucherSerializer
+    http_method_names = ['patch']
+
+    def get_queryset(self):
+        return ERPVoucher.objects.all()
+
+    def patch(self, request, *args, **kwargs):
+        voucher = self.get_object()
+
+        if voucher.status != 'draft':
+            return Response(
+                {'error': f'Only draft vouchers can be rejected. Current status: {voucher.status}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        voucher.status = 'rejected'
+        voucher.save()
+
+        return Response(
+            ERPVoucherSerializer(voucher).data,
+            status=status.HTTP_200_OK
+        )
 
 
 # =====================================================

@@ -63,6 +63,8 @@ from mainapp.views import (
     ERPVoucherListView,
     ERPVoucherDetailView,
     ERPVoucherCreateView,
+    ERPVoucherRejectView,
+    ERPVoucherApproveView,
 
     # 11. Project Visit
     ERPProjectVisitListView,
@@ -260,9 +262,11 @@ urlpatterns = [
     # 10. VOUCHER
     # ?type=debit|credit|journal|contra
     # =====================================================
-    path('erp-vouchers/', ERPVoucherListView.as_view(), name='erp-voucher-list'),
-    path('erp-vouchers/<int:pk>/', ERPVoucherDetailView.as_view(), name='erp-voucher-detail'),
-    path('erp-vouchers/new/', ERPVoucherCreateView.as_view(), name='erp-voucher-create'),
+path('erp-vouchers/', ERPVoucherListView.as_view(), name='erp-voucher-list'),
+path('erp-vouchers/new/', ERPVoucherCreateView.as_view(), name='erp-voucher-create'),
+path('erp-vouchers/<int:pk>/', ERPVoucherDetailView.as_view(), name='erp-voucher-detail'),
+path('erp-vouchers/approve/<int:pk>/', ERPVoucherApproveView.as_view(), name='erp-voucher-approve'),
+path('erp-vouchers/reject/<int:pk>/', ERPVoucherRejectView.as_view(), name='erp-voucher-reject'),
 
     # =====================================================
     # 11. PROJECT VISIT
@@ -341,7 +345,7 @@ urlpatterns = [
     path('erp-dividends/new/', ERPDividendCreateView.as_view(), name='erp-dividend-create'),
 
     # =====================================================
-    # 17. HR — EMPLOYEE, ATTENDANCE, PAYROLL
+    # 17. HR — EMPLOYEE, ATTENDANCE, PAYROLL (DONE)
     # =====================================================
     path('erp-employees/', ERPEmployeeListView.as_view(), name='erp-employee-list'),
     path('erp-employees/new/', ERPEmployeeCreateView.as_view(), name='erp-employee-create'),  # ✅ আগে
