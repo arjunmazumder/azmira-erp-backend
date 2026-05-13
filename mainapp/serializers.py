@@ -68,6 +68,7 @@ class ERPUserSerializer(serializers.ModelSerializer):
         return obj.get_department_display() if obj.department else None
 
 class ERPUserCreateSerializer(serializers.ModelSerializer):
+    is_active = serializers.BooleanField(default=True, required=False)
     password = serializers.CharField(write_only=True, required=False)
     roles = serializers.ListField(
         child=serializers.CharField(),

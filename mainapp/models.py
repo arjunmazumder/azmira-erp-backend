@@ -976,23 +976,28 @@ class ERPMarketingOfficer(models.Model):
 
 class ERPWallet(models.Model):
     WALLET_TYPE_CHOICES = [
-        ('marketing', 'Marketing Officer Wallet'),
-        ('investor', 'Investor Wallet'),
-        ('customer_care', 'Customer Care Wallet'),
+        ('marketing','Marketing Officer Wallet'),
+        ('investor','Investor Wallet'),
+        ('customer','Customer Wallet'),
+        ('customer_care','Customer Care Wallet'),
+        ('employee','Employee Wallet'),
+        ('accounts','Accounts Officer Wallet'),
+        ('admin','Admin Wallet'),
+        ('general','General Wallet'),    
     ]
 
-    id = models.BigAutoField(primary_key=True)
-    user = models.OneToOneField(ERPUser, on_delete=models.CASCADE, related_name='wallet')
-    wallet_type = models.CharField(max_length=20, choices=WALLET_TYPE_CHOICES, default='marketing')
-    balance = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    id= models.BigAutoField(primary_key=True)
+    user= models.OneToOneField(ERPUser, on_delete=models.CASCADE, related_name='wallet')
+    wallet_type= models.CharField(max_length=20, choices=WALLET_TYPE_CHOICES, default='general')
+    balance= models.DecimalField(max_digits=16, decimal_places=2, default=0)
     last_dividend_check = models.DateField(blank=True, null=True)
-    dividend_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    loan_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    dividend_rate= models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    loan_balance= models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    created_at= models.DateTimeField(auto_now_add=True)
+    updated_at= models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f'Wallet - {self.user.full_name} - {self.balance}'
+        return f'Wallet - {self.user.full_name} ({self.wallet_type}) - {self.balance}'
 
 
 class ERPWalletTransaction(models.Model):
