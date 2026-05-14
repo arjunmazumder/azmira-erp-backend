@@ -1,3 +1,9 @@
+
+
+from decimal import Decimal
+from django.db import transaction
+from django.utils import timezone
+
 def generate_commission(booking, amount, source_type):
     from .models import ERPCommissionRule, ERPCommission
 
@@ -33,15 +39,10 @@ def generate_commission(booking, amount, source_type):
         generation += 1
 
 
-
 # api/services.py
 # =====================================================
 # COMMISSION SERVICE — মূল কমিশন লজিক এখানে
 # =====================================================
-
-from decimal import Decimal
-from django.db import transaction
-from django.utils import timezone
 
 
 def get_upline_chain(marketing_officer, max_levels=7):

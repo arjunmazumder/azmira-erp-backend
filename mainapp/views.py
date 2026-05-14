@@ -98,9 +98,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
-
-from core.filters import ERPLandAcquisitionFilter
-
+from core.filters import ERPLandAcquisitionFilter, ERPPlotFilter, ERPProjectFilter
 
 # =====================================================
 # 1. USER & AUTH VIEWS
@@ -203,6 +201,28 @@ class ERPProjectListView(generics.ListAPIView):
     permission_classes = [AllowAny]
     queryset = ERPProject.objects.all()
     serializer_class = ERPProjectSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = ERPProjectFilter
+    search_fields = [
+        'project_name',       
+        'project_code',       
+        'description',        
+        'address',            
+        'city',               
+        'district',           
+        'upazila',            
+        'mouza',            
+    ]
+    ordering_fields = [
+        'total_project_value',
+        'total_land_area',
+        'total_plots',
+        'available_plots',
+        'launch_date',
+        'completion_date',
+        'created_at',
+    ]
+    ordering = ['-created_at']  # default ordering
 
 
 class ERPProjectDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -224,19 +244,51 @@ class ERPProjectCreateView(generics.CreateAPIView):
 # =====================================================
 
 class ERPPlotListView(generics.ListAPIView):
-    """GET /api/erp-plots/ — ?project=<id>&status=<status>"""
+    """
+    GET /api/erp-plots/
+ 
+    Filter params:
+        project, status, plot_type, facing,
+        bedrooms, bathrooms, floor_number,
+        min_price, max_price, min_area, max_area
+ 
+    Search params:
+        ?search=<keyword>
+ 
+    Ordering params:
+        ?ordering=final_price / -final_price / area / created_at
+    """
     permission_classes = [AllowAny]
     serializer_class = ERPPlotSerializer
-
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = ERPPlotFilter
+    search_fields = [
+        'plot_number',          
+        'notes',               
+        'flat_number',          
+        'facing',              
+        'plot_type',            
+        'road',                 
+        'building_type',        
+        'building_orientation', 
+        'area_unit',            
+        'project__project_name',
+        'project__project_code',
+        'project__city',        
+        'project__district',    
+    ]
+    ordering_fields = [
+        'final_price',
+        'total_price',
+        'area',
+        'floor_number',
+        'plot_number',
+        'created_at',
+    ]
+    ordering = ['plot_number']  # default ordering
+ 
     def get_queryset(self):
-        qs = ERPPlot.objects.all()
-        project_id = self.request.query_params.get('project')
-        status_filter = self.request.query_params.get('status')
-        if project_id:
-            qs = qs.filter(project_id=project_id)
-        if status_filter:
-            qs = qs.filter(status=status_filter)
-        return qs
+        return ERPPlot.objects.select_related('project').all()
 
 
 class ERPPlotDetailView(generics.RetrieveUpdateDestroyAPIView):

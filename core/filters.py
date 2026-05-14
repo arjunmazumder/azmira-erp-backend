@@ -1,6 +1,7 @@
 import django_filters
 from mainapp.models import ERPPlot
 from mainapp.models import ERPProject
+from mainapp.models import ERPLandAcquisition
 
 
 class ERPPlotFilter(django_filters.FilterSet):
@@ -70,6 +71,7 @@ class ERPProjectFilter(django_filters.FilterSet):
     class Meta:
         model = ERPProject
         fields = [
+            'project_name',
             'project_type',
             'status',
             'city',
@@ -78,7 +80,7 @@ class ERPProjectFilter(django_filters.FilterSet):
         ]
 
 
-from mainapp.models import ERPLandAcquisition
+
 
 
 class ERPLandAcquisitionFilter(django_filters.FilterSet):
