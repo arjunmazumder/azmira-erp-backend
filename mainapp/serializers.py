@@ -399,14 +399,33 @@ class ERPCommissionSerializer(serializers.ModelSerializer):
 # ===== 15. LOAN =====
 
 class ERPLoanSerializer(serializers.ModelSerializer):
-    user_name = serializers.ReadOnlyField(source='user.full_name')
+    # ✅ null check সহ
+    user_name = serializers.SerializerMethodField()
+    approved_by_name = serializers.SerializerMethodField()
     status_display = serializers.SerializerMethodField()
 
     class Meta:
         model = ERPLoan
         fields = '__all__'
 
-    def get_status_display(self, obj): return obj.get_status_display()
+    def get_user_name(self, obj):
+        return obj.user.full_name if obj.user else None
+
+    def get_approved_by_name(self, obj):
+        return obj.approved_by.full_name if obj.approved_by else None
+
+    def get_status_display(self, obj):
+        return obj.get_status_display()
+
+    def validate(self, data):
+        # ✅ remaining_amount loan_amount এর চেয়ে বেশি হতে পারবে না
+        loan_amount = data.get('loan_amount', getattr(self.instance, 'loan_amount', 0))
+        remaining = data.get('remaining_amount', getattr(self.instance, 'remaining_amount', 0))
+        if remaining > loan_amount:
+            raise serializers.ValidationError(
+                'Remaining amount cannot exceed loan amount.'
+            )
+        return data
 
 
 # ===== 16. INVESTOR =====

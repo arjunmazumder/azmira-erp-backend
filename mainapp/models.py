@@ -1121,16 +1121,42 @@ class ERPLoan(models.Model):
     ]
 
     id = models.BigAutoField(primary_key=True)
-    user = models.ForeignKey(ERPUser, on_delete=models.CASCADE, related_name='loans')
+
+    # ✅ CASCADE → PROTECT — loan থাকলে user delete করতে দেবে না
+    user = models.ForeignKey(
+        ERPUser, on_delete=models.PROTECT,
+        related_name='loans'
+    )
     loan_amount = models.DecimalField(max_digits=12, decimal_places=2)
-    remaining_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    remaining_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     loan_date = models.DateField(default=date.today)
     reason = models.TextField(blank=True, null=True, default='')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
-    approved_by = models.CharField(max_length=100, blank=True, null=True, default='')
+
+    # ✅ CharField → FK
+    approved_by = models.ForeignKey(
+        'ERPUser', on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='approved_loans'
+    )
     approved_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        # ✅ নতুন loan এ remaining_amount auto set
+        if not self.pk:
+            self.remaining_amount = self.loan_amount
+
+        # ✅ status auto-update
+        if self.remaining_amount <= 0:
+            self.status = 'paid'
+        elif self.remaining_amount < self.loan_amount:
+            self.status = 'partially_paid'
+        else:
+            self.status = 'active'
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'Loan - {self.user.full_name} - {self.loan_amount}'

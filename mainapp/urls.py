@@ -99,6 +99,7 @@ from mainapp.views import (
     ERPLoanListView,
     ERPLoanDetailView,
     ERPLoanCreateView,
+    ERPLoanRepaymentView,
 
     # 16. Investor
     ERPInvestorListView,
@@ -262,11 +263,11 @@ urlpatterns = [
     # 10. VOUCHER
     # ?type=debit|credit|journal|contra
     # =====================================================
-path('erp-vouchers/', ERPVoucherListView.as_view(), name='erp-voucher-list'),
-path('erp-vouchers/new/', ERPVoucherCreateView.as_view(), name='erp-voucher-create'),
-path('erp-vouchers/<int:pk>/', ERPVoucherDetailView.as_view(), name='erp-voucher-detail'),
-path('erp-vouchers/approve/<int:pk>/', ERPVoucherApproveView.as_view(), name='erp-voucher-approve'),
-path('erp-vouchers/reject/<int:pk>/', ERPVoucherRejectView.as_view(), name='erp-voucher-reject'),
+    path('erp-vouchers/', ERPVoucherListView.as_view(), name='erp-voucher-list'),
+    path('erp-vouchers/new/', ERPVoucherCreateView.as_view(), name='erp-voucher-create'),
+    path('erp-vouchers/<int:pk>/', ERPVoucherDetailView.as_view(), name='erp-voucher-detail'),
+    path('erp-vouchers/approve/<int:pk>/', ERPVoucherApproveView.as_view(), name='erp-voucher-approve'),
+    path('erp-vouchers/reject/<int:pk>/', ERPVoucherRejectView.as_view(), name='erp-voucher-reject'),
 
     # =====================================================
     # 11. PROJECT VISIT
@@ -326,8 +327,9 @@ path('erp-vouchers/reject/<int:pk>/', ERPVoucherRejectView.as_view(), name='erp-
     # ?user=<id>
     # =====================================================
     path('erp-loans/', ERPLoanListView.as_view(), name='erp-loan-list'),
-    path('erp-loans/<int:pk>/', ERPLoanDetailView.as_view(), name='erp-loan-detail'),
     path('erp-loans/new/', ERPLoanCreateView.as_view(), name='erp-loan-create'),
+    path('erp-loans/<int:pk>/', ERPLoanDetailView.as_view(), name='erp-loan-detail'),
+    path('erp-loans/<int:pk>/repay/', ERPLoanRepaymentView.as_view(), name='erp-loan-repay'),
 
     # =====================================================
     # 16. INVESTOR

@@ -1335,35 +1335,123 @@ def officer_commission_detail(request, officer_id):
 # =====================================================
 
 class ERPLoanListView(generics.ListAPIView):
-    """GET /api/erp-loans/ — ?user=<id>"""
     serializer_class = ERPLoanSerializer
 
     def get_queryset(self):
-        qs = ERPLoan.objects.all()
+        # ✅ select_related
+        qs = ERPLoan.objects.select_related('user', 'approved_by').all()
+
         user_id = self.request.query_params.get('user')
+        status  = self.request.query_params.get('status')
+
         if user_id:
             qs = qs.filter(user_id=user_id)
+        if status:
+            qs = qs.filter(status=status)
+
         return qs
 
 
 class ERPLoanDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = ERPLoan.objects.all()
     serializer_class = ERPLoanSerializer
+
+    def get_queryset(self):
+        return ERPLoan.objects.select_related('user', 'approved_by')
+
+    # ✅ paid loan delete করা যাবে না
+    def destroy(self, request, *args, **kwargs):
+        loan = self.get_object()
+        if loan.status == 'paid':
+            return Response(
+                {'error': 'Paid loan cannot be deleted.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().destroy(request, *args, **kwargs)
 
 
 class ERPLoanCreateView(generics.CreateAPIView):
-    queryset = ERPLoan.objects.all()
     serializer_class = ERPLoanSerializer
+
+    def get_queryset(self):
+        return ERPLoan.objects.select_related('user', 'approved_by')
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        loan = serializer.save()
-        wallet = ERPWallet.objects.filter(user_id=loan.user_id).first()
-        if wallet:
-            wallet.loan_balance += loan.loan_amount
-            wallet.save()
-        return Response(self.get_serializer(loan).data, status=status.HTTP_201_CREATED)
+
+        # ✅ transaction.atomic — loan আর wallet একসাথে, একটা fail হলে দুটোই rollback
+        try:
+            with transaction.atomic():
+                loan = serializer.save()
+                wallet = ERPWallet.objects.filter(user_id=loan.user_id).first()
+                if wallet:
+                    wallet.loan_balance += loan.loan_amount
+                    wallet.save()
+                else:
+                    raise ValueError('Wallet not found for this user.')
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response(
+            self.get_serializer(loan).data,
+            status=status.HTTP_201_CREATED
+        )
+
+# ✅ Repayment এর আলাদা endpoint — remaining_amount কমাবে
+class ERPLoanRepaymentView(generics.UpdateAPIView):
+    serializer_class = ERPLoanSerializer
+    http_method_names = ['patch']
+
+    def get_queryset(self):
+        return ERPLoan.objects.select_related('user', 'approved_by')
+
+    def patch(self, request, *args, **kwargs):
+        loan = self.get_object()
+
+        if loan.status == 'paid':
+            return Response(
+                {'error': 'This loan is already fully paid.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        repay_amount = request.data.get('repay_amount')
+        if not repay_amount:
+            return Response(
+                {'error': 'repay_amount is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        repay_amount = Decimal(str(repay_amount))
+
+        if repay_amount <= 0:
+            return Response(
+                {'error': 'repay_amount must be greater than 0.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if repay_amount > loan.remaining_amount:
+            return Response(
+                {'error': f'repay_amount cannot exceed remaining amount ({loan.remaining_amount}).'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ✅ atomic — loan আর wallet একসাথে update
+        with transaction.atomic():
+            loan.remaining_amount -= repay_amount
+            loan.save()  # save() এ status auto-update হবে
+
+            wallet = ERPWallet.objects.filter(user_id=loan.user_id).first()
+            if wallet:
+                wallet.loan_balance -= repay_amount
+                wallet.save()
+
+        return Response(
+            self.get_serializer(loan).data,
+            status=status.HTTP_200_OK
+        )
 
 
 # =====================================================
