@@ -825,7 +825,7 @@ class ERPMoneyReceipt(models.Model):
 
 
 # =====================================================
-# 10. VOUCHER
+# 10. VOUCHER (DONE)
 # =====================================================
 class ERPVoucher(models.Model):
     VOUCHER_TYPE_CHOICES = [
@@ -888,7 +888,7 @@ class ERPVoucher(models.Model):
     
 
 # =====================================================
-# 11. PROJECT VISIT
+# 11. PROJECT VISIT (DONE)
 # =====================================================
 class ERPProjectVisit(models.Model):
     STATUS_CHOICES = [
@@ -948,7 +948,7 @@ class ERPProjectVisit(models.Model):
     def __str__(self):
         return f'Visit - {self.project.project_name} - {self.visit_date}'
     
-    
+
 # =====================================================
 # 12. MARKETING OFFICER (DONE)
 # =====================================================
@@ -1130,7 +1130,7 @@ class ERPCommission(models.Model):
     
 
 # =====================================================
-# 15. LOAN
+# 15. LOAN (DONE)
 # =====================================================
 
 class ERPLoan(models.Model):
@@ -1713,23 +1713,31 @@ class ERPSMSLog(models.Model):
 
     id = models.BigAutoField(primary_key=True)
     recipient_phone = models.CharField(max_length=20)
-    recipient_name = models.CharField(max_length=200, blank=True, null=True, default='')
+    recipient_name  = models.CharField(max_length=200, blank=True, null=True, default='')
     sms_type = models.CharField(max_length=30, choices=SMS_TYPE_CHOICES)
-    message = models.TextField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    customer = models.ForeignKey(ERPCustomer, on_delete=models.SET_NULL, null=True, blank=True, related_name='sms_logs')
-    booking = models.ForeignKey(ERPBooking, on_delete=models.SET_NULL, null=True, blank=True, related_name='sms_logs')
-    officer = models.ForeignKey(ERPMarketingOfficer, on_delete=models.SET_NULL, null=True, blank=True, related_name='sms_logs')
-    sent_at = models.DateTimeField(blank=True, null=True)
+    message  = models.TextField()
+    status   = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    customer = models.ForeignKey(
+        ERPCustomer, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='sms_logs'
+    )
+    booking = models.ForeignKey(
+        ERPBooking, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='sms_logs'
+    )
+    officer = models.ForeignKey(
+        ERPMarketingOfficer, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='sms_logs'
+    )
+    sent_at       = models.DateTimeField(blank=True, null=True)
     error_message = models.TextField(blank=True, null=True, default='')
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-created_at']
 
     def __str__(self):
         return f'SMS - {self.recipient_phone} - {self.sms_type}'
-
 
 # =====================================================
 # 22. DOCUMENT

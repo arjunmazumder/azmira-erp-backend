@@ -582,16 +582,35 @@ class ERPOfferSerializer(serializers.ModelSerializer):
 
 # ===== 21. SMS LOG =====
 
+
 class ERPSMSLogSerializer(serializers.ModelSerializer):
     sms_type_display = serializers.SerializerMethodField()
-    status_display = serializers.SerializerMethodField()
+    status_display   = serializers.SerializerMethodField()
+
+    # ✅ extra display fields
+    customer_name = serializers.SerializerMethodField()
+    booking_code  = serializers.SerializerMethodField()
+    officer_name  = serializers.SerializerMethodField()
 
     class Meta:
-        model = ERPSMSLog
+        model  = ERPSMSLog
         fields = '__all__'
 
-    def get_sms_type_display(self, obj): return obj.get_sms_type_display()
-    def get_status_display(self, obj): return obj.get_status_display()
+    def get_sms_type_display(self, obj):
+        return obj.get_sms_type_display()
+
+    def get_status_display(self, obj):
+        return obj.get_status_display()
+
+    def get_customer_name(self, obj):
+        return obj.customer.full_name if obj.customer else None
+
+    def get_booking_code(self, obj):
+        return obj.booking.booking_code if obj.booking else None
+
+    def get_officer_name(self, obj):
+        return obj.officer.user.full_name if obj.officer else None
+    
 
 
 # ===== 22. DOCUMENT =====

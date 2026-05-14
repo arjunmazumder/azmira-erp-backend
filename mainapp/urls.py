@@ -389,8 +389,8 @@ urlpatterns = [
     # ?customer=<id>&type=<sms_type>
     # =====================================================
     path('erp-sms-logs/', ERPSMSLogListView.as_view(), name='erp-sms-log-list'),
-    path('erp-sms-logs/<int:pk>/', ERPSMSLogDetailView.as_view(), name='erp-sms-log-detail'),
     path('erp-sms-logs/new/', ERPSMSLogCreateView.as_view(), name='erp-sms-log-create'),
+    path('erp-sms-logs/<int:pk>/', ERPSMSLogDetailView.as_view(), name='erp-sms-log-detail'),
 
     # =====================================================
     # 22. DOCUMENT

@@ -883,7 +883,7 @@ class ERPProjectVisitCreateView(generics.CreateAPIView):
         )
     
 
-    
+
 # =====================================================
 # 12. MARKETING OFFICER VIEWS
 # =====================================================
@@ -1868,26 +1868,55 @@ class ERPSMSLogListView(generics.ListAPIView):
     serializer_class = ERPSMSLogSerializer
 
     def get_queryset(self):
-        qs = ERPSMSLog.objects.all()
+        # ✅ select_related
+        qs = ERPSMSLog.objects.select_related(
+            'customer', 'booking', 'officer__user'
+        ).all()
+
         customer_id = self.request.query_params.get('customer')
         sms_type    = self.request.query_params.get('type')
+        status      = self.request.query_params.get('status')
+        booking_id  = self.request.query_params.get('booking')
+
         if customer_id:
             qs = qs.filter(customer_id=customer_id)
         if sms_type:
             qs = qs.filter(sms_type=sms_type)
+        if status:
+            qs = qs.filter(status=status)
+        if booking_id:
+            qs = qs.filter(booking_id=booking_id)
+
         return qs
 
 
 class ERPSMSLogDetailView(generics.RetrieveAPIView):
-    queryset = ERPSMSLog.objects.all()
+    # ✅ শুধু GET — SMS log immutable
     serializer_class = ERPSMSLogSerializer
+
+    def get_queryset(self):
+        return ERPSMSLog.objects.select_related(
+            'customer', 'booking', 'officer__user'
+        )
 
 
 class ERPSMSLogCreateView(generics.CreateAPIView):
-    queryset = ERPSMSLog.objects.all()
     serializer_class = ERPSMSLogSerializer
 
+    def get_queryset(self):
+        return ERPSMSLog.objects.select_related(
+            'customer', 'booking', 'officer__user'
+        )
 
+    # ✅ sent হলে sent_at auto set
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        if instance.status == 'sent' and not instance.sent_at:
+            instance.sent_at = datetime.now()
+            instance.save()
+
+
+            
 # =====================================================
 # 22. DOCUMENT VIEWS
 # =====================================================
