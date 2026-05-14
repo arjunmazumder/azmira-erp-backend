@@ -353,11 +353,11 @@ This project is proprietary software developed for **Azmira Real Estate**. All r
 
 ## 👨‍💻 Developer
 
-**Md. [Your Name]**
+**[Arjun Mazumder]**
 Backend Developer — Django REST Framework  
-📧 your@email.com  
-🔗 [linkedin.com/in/yourprofile](https://linkedin.com/in/yourprofile)  
-🐙 [github.com/yourusername](https://github.com/yourusername)
+📧 arjumazumder2@gmail.com  
+🔗 [www.linkedin.com/in/arzunmazumder] 
+🐙 [github.com/arjunmazumder]
 
 ---
 
