@@ -274,8 +274,8 @@ urlpatterns = [
     # ?project=<id>&officer=<id>
     # =====================================================
     path('erp-visits/', ERPProjectVisitListView.as_view(), name='erp-visit-list'),
-    path('erp-visits/<int:pk>/', ERPProjectVisitDetailView.as_view(), name='erp-visit-detail'),
     path('erp-visits/new/', ERPProjectVisitCreateView.as_view(), name='erp-visit-create'),
+    path('erp-visits/<int:pk>/', ERPProjectVisitDetailView.as_view(), name='erp-visit-detail'),
 
     # =====================================================
     # 12. MARKETING OFFICER

@@ -292,19 +292,42 @@ class ERPVoucherSerializer(serializers.ModelSerializer):
 # ===== 11. PROJECT VISIT =====
 
 class ERPProjectVisitSerializer(serializers.ModelSerializer):
-    project_name = serializers.ReadOnlyField(source='project.project_name')
+    project_name = serializers.SerializerMethodField()
     officer_name = serializers.SerializerMethodField()
-    customer_name = serializers.ReadOnlyField(source='customer.full_name')
+
+    # ✅ null check সহ
+    customer_name = serializers.SerializerMethodField()
+    confirmed_by_name = serializers.SerializerMethodField()
     status_display = serializers.SerializerMethodField()
 
     class Meta:
         model = ERPProjectVisit
         fields = '__all__'
 
+    def get_project_name(self, obj):
+        return obj.project.project_name if obj.project else None
+
     def get_officer_name(self, obj):
         return obj.marketing_officer.user.full_name if obj.marketing_officer else None
 
-    def get_status_display(self, obj): return obj.get_status_display()
+    def get_customer_name(self, obj):
+        return obj.customer.full_name if obj.customer else None
+
+    def get_confirmed_by_name(self, obj):
+        return obj.confirmed_by.full_name if obj.confirmed_by else None
+
+    def get_status_display(self, obj):
+        return obj.get_status_display()
+
+    def validate(self, data):
+        # ✅ completed/no_show হলে outcome দিতে হবে
+        new_status = data.get('status', getattr(self.instance, 'status', None))
+        outcome = data.get('outcome', getattr(self.instance, 'outcome', ''))
+        if new_status in ['completed', 'no_show'] and not outcome:
+            raise serializers.ValidationError(
+                'Outcome is required when status is completed or no_show.'
+            )
+        return data
 
 
 # ===== 12. MARKETING OFFICER =====

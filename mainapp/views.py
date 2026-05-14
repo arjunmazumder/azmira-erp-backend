@@ -789,42 +789,101 @@ class ERPVoucherRejectView(generics.UpdateAPIView):
 # =====================================================
 
 class ERPProjectVisitListView(generics.ListAPIView):
-    """GET /api/erp-visits/ — ?project=<id>&officer=<id>"""
     serializer_class = ERPProjectVisitSerializer
 
     def get_queryset(self):
-        qs = ERPProjectVisit.objects.all()
+        # ✅ select_related
+        qs = ERPProjectVisit.objects.select_related(
+            'project',
+            'customer',
+            'lead',
+            'marketing_officer__user',
+            'confirmed_by'
+        ).all()
+
         project_id = self.request.query_params.get('project')
         officer_id = self.request.query_params.get('officer')
+        status     = self.request.query_params.get('status')
+        lead_id    = self.request.query_params.get('lead')
+
         if project_id:
             qs = qs.filter(project_id=project_id)
         if officer_id:
             qs = qs.filter(marketing_officer_id=officer_id)
+        if status:
+            qs = qs.filter(status=status)
+        if lead_id:
+            qs = qs.filter(lead_id=lead_id)
+
         return qs
 
 
 class ERPProjectVisitDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = ERPProjectVisit.objects.all()
     serializer_class = ERPProjectVisitSerializer
 
+    def get_queryset(self):
+        return ERPProjectVisit.objects.select_related(
+            'project', 'customer', 'lead',
+            'marketing_officer__user', 'confirmed_by'
+        )
+
     def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=True
+        )
         serializer.is_valid(raise_exception=True)
-        if request.data.get('status') == 'confirmed' and not instance.confirmed_by:
-            instance.confirmed_by = request.data.get('confirmed_by', '')
-            instance.confirmed_at = datetime.now()
-            instance.save()
-        serializer.save()
-        return Response(self.get_serializer(instance).data)
+
+        new_status = request.data.get('status')
+
+        # ✅ confirmed হলে confirmed_by + confirmed_at auto set
+        # double save() নেই — serializer.save() এ একবারেই হচ্ছে
+        save_kwargs = {}
+        if new_status == 'confirmed' and not instance.confirmed_by_id:
+            confirmed_by_id = request.data.get('confirmed_by')
+            if not confirmed_by_id:
+                return Response(
+                    {'error': 'confirmed_by is required when confirming a visit.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            save_kwargs['confirmed_by_id'] = confirmed_by_id
+            save_kwargs['confirmed_at']    = datetime.now()
+
+        visit = serializer.save(**save_kwargs)
+
+        # ✅ completed হলে Lead status → visited auto update
+        if new_status == 'completed' and visit.lead:
+            visit.lead.status = 'visited'
+            visit.lead.last_contacted = datetime.now()
+            visit.lead.save()
+
+        return Response(
+            self.get_serializer(visit).data,
+            status=status.HTTP_200_OK
+        )
+
+    # ✅ completed visit delete করা যাবে না
+    def destroy(self, request, *args, **kwargs):
+        visit = self.get_object()
+        if visit.status == 'completed':
+            return Response(
+                {'error': 'Completed visit cannot be deleted.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().destroy(request, *args, **kwargs)
 
 
 class ERPProjectVisitCreateView(generics.CreateAPIView):
-    queryset = ERPProjectVisit.objects.all()
     serializer_class = ERPProjectVisitSerializer
 
+    def get_queryset(self):
+        return ERPProjectVisit.objects.select_related(
+            'project', 'customer', 'lead',
+            'marketing_officer__user', 'confirmed_by'
+        )
+    
 
+    
 # =====================================================
 # 12. MARKETING OFFICER VIEWS
 # =====================================================

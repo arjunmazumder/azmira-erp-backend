@@ -890,7 +890,6 @@ class ERPVoucher(models.Model):
 # =====================================================
 # 11. PROJECT VISIT
 # =====================================================
-
 class ERPProjectVisit(models.Model):
     STATUS_CHOICES = [
         ('scheduled', 'Scheduled'),
@@ -901,9 +900,20 @@ class ERPProjectVisit(models.Model):
     ]
 
     id = models.BigAutoField(primary_key=True)
-    project = models.ForeignKey(ERPProject, on_delete=models.CASCADE, related_name='visits')
-    customer = models.ForeignKey(ERPCustomer, on_delete=models.SET_NULL, null=True, blank=True, related_name='visits')
-    lead = models.ForeignKey(ERPLead, on_delete=models.SET_NULL, null=True, blank=True, related_name='visits')
+
+    # ✅ CASCADE → PROTECT
+    project = models.ForeignKey(
+        ERPProject, on_delete=models.PROTECT,
+        related_name='visits'
+    )
+    customer = models.ForeignKey(
+        ERPCustomer, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='visits'
+    )
+    lead = models.ForeignKey(
+        ERPLead, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='visits'
+    )
     guest_name = models.CharField(max_length=200, blank=True, null=True, default='')
     guest_phone = models.CharField(max_length=20, blank=True, null=True, default='')
     visit_date = models.DateTimeField()
@@ -912,12 +922,22 @@ class ERPProjectVisit(models.Model):
         null=True, blank=True, related_name='arranged_visits'
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='scheduled')
-    confirmed_by = models.CharField(max_length=100, blank=True, null=True, default='')
+
+    # ✅ CharField → FK
+    confirmed_by = models.ForeignKey(
+        'ERPUser', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='confirmed_visits'
+    )
     confirmed_at = models.DateTimeField(blank=True, null=True)
     outcome = models.TextField(blank=True, null=True, default='')
-    interested = models.BooleanField(default=True)
-    notification_sent_24h = models.BooleanField(default=True)
-    notification_sent_2h = models.BooleanField(default=True)
+
+    # ✅ default=False — visit হওয়ার আগে interested জানার প্রশ্নই নেই
+    interested = models.BooleanField(default=False)
+
+    # ✅ default=False — নতুন visit এ notification যায়নি
+    notification_sent_24h = models.BooleanField(default=False)
+    notification_sent_2h  = models.BooleanField(default=False)
+
     notes = models.TextField(blank=True, null=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -927,8 +947,8 @@ class ERPProjectVisit(models.Model):
 
     def __str__(self):
         return f'Visit - {self.project.project_name} - {self.visit_date}'
-
-
+    
+    
 # =====================================================
 # 12. MARKETING OFFICER (DONE)
 # =====================================================
