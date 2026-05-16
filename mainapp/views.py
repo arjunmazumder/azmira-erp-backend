@@ -481,7 +481,7 @@ class ERPBookingSpecificInstallmentListView(generics.ListAPIView):
         return ERPInstallmentPlan.objects.filter(booking__booking_code=booking_code)
 
 
-class ERPInstallmentUpdateView(generics.RetrieveUpdateAPIView):
+class ERPInstallmentUpdateView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ERPInstallmentPlan.objects.all()
     serializer_class = ERPInstallmentPlanSerializer
 
