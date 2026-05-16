@@ -77,7 +77,7 @@ class ERPUser(models.Model):
     employee_id = models.CharField(max_length=50,blank=True,null=True,default='')
 
     # Default TRUE fields
-    is_active = models.BooleanField(default=True, requird=False)
+    is_active = models.BooleanField(default=True)
 
     last_login = models.DateTimeField(blank=True,null=True)
 
@@ -636,7 +636,7 @@ class ERPInstallmentPlan(models.Model):
     paid_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     due_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
-    is_paid = models.BooleanField(default=False, require=False)
+    is_paid = models.BooleanField(default=False)
 
     # 🔥 Future-ready SMS tracking (recommended)
     sms_sent_48h_flag = models.BooleanField(default=True)
