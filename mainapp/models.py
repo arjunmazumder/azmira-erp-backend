@@ -51,102 +51,41 @@ class ERPUser(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    username = models.CharField(
-        max_length=150,
-        unique=True
-    )
+    username = models.CharField(max_length=150,unique=True)
 
-    email = models.EmailField(
-        max_length=254,
-        unique=True
-    )
+    email = models.EmailField(max_length=254,unique=True)
 
-    password_hash = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True,
-        default=''
-    )
+    password_hash = models.CharField(max_length=255,blank=True,null=True,default='')
 
-    full_name = models.CharField(
-        max_length=200
-    )
+    full_name = models.CharField(max_length=200)
 
-    phone = models.CharField(
-        max_length=20,
-        blank=True,
-        null=True,
-        default=''
-    )
+    phone = models.CharField(max_length=20,blank=True,null=True,default='')
 
-    address = models.TextField(
-        blank=True,
-        null=True,
-        default=''
-    )
+    address = models.TextField(blank=True,null=True,default='')
 
-    nid = models.CharField(
-        max_length=50,
-        blank=True,
-        null=True,
-        default=''
-    )
+    nid = models.CharField(max_length=50,blank=True,null=True,default='')
 
-    date_of_birth = models.DateField(
-        blank=True,
-        null=True
-    )
+    date_of_birth = models.DateField(blank=True,null=True)
 
-    image = models.ImageField(
-        upload_to='erp/users/',
-        blank=True,
-        null=True
-    )
+    image = models.ImageField(upload_to='erp/users/',blank=True,null=True)
 
     # Multiple roles
-    roles = models.JSONField(
-        default=list,
-        blank=True,
-        null=True
-    )
+    roles = models.JSONField(default=list,blank=True,null=True)
 
-    department = models.CharField(
-        max_length=50,
-        choices=DEPARTMENT_CHOICES,
-        blank=True,
-        null=True,
-        default=''
-    )
+    department = models.CharField(max_length=50,choices=DEPARTMENT_CHOICES,blank=True,null=True,default='')
 
-    employee_id = models.CharField(
-        max_length=50,
-        blank=True,
-        null=True,
-        default=''
-    )
+    employee_id = models.CharField(max_length=50,blank=True,null=True,default='')
 
     # Default TRUE fields
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, requird=False)
 
-    last_login = models.DateTimeField(
-        blank=True,
-        null=True
-    )
+    last_login = models.DateTimeField(blank=True,null=True)
 
-    created_at = models.DateTimeField(
-        auto_now_add=True
-    )
+    created_at = models.DateTimeField(auto_now_add=True)
 
-    updated_at = models.DateTimeField(
-        auto_now=True
-    )
+    updated_at = models.DateTimeField(auto_now=True)
 
-    created_by = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-        default=''
-    )
+    created_by = models.CharField(max_length=100,blank=True,null=True,default='')
 
     class Meta:
         ordering = ['-created_at']
@@ -223,7 +162,7 @@ class ERPUser(models.Model):
 
 class ERPProject(models.Model):
     PROJECT_TYPE_CHOICES = [
-        ('lot', 'Plot/Lot'),
+        ('plot', 'Plot/Lot'),
         ('flat', 'Flat/Apartment'),
         ('investment', 'Investment'),
         ('commercial', 'Commercial'),
@@ -697,7 +636,7 @@ class ERPInstallmentPlan(models.Model):
     paid_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     due_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
-    is_paid = models.BooleanField(default=True)
+    is_paid = models.BooleanField(default=False, require=False)
 
     # 🔥 Future-ready SMS tracking (recommended)
     sms_sent_48h_flag = models.BooleanField(default=True)
