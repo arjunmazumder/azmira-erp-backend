@@ -842,7 +842,7 @@ class ERPProjectVisit(models.Model):
 
     # ✅ CASCADE → PROTECT
     project = models.ForeignKey(
-        ERPProject, on_delete=models.PROTECT,
+        ERPProject, on_delete=models.CASCADE,
         related_name='visits'
     )
     customer = models.ForeignKey(
