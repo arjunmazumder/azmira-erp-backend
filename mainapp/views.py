@@ -1916,35 +1916,54 @@ class ERPSMSLogCreateView(generics.CreateAPIView):
             instance.save()
 
 
-            
+
 # =====================================================
 # 22. DOCUMENT VIEWS
 # =====================================================
+
 
 class ERPDocumentListView(generics.ListAPIView):
     serializer_class = ERPDocumentSerializer
 
     def get_queryset(self):
-        qs = ERPDocumentSerializer
-        qs = ERPDocument.objects.all()
-        booking_id = self.request.query_params.get('booking')
-        doc_type   = self.request.query_params.get('type')
+        # ✅ bug fix + select_related
+        qs = ERPDocument.objects.select_related(
+            'booking', 'project', 'customer', 'created_by'
+        ).all()
+
+        booking_id  = self.request.query_params.get('booking')
+        doc_type    = self.request.query_params.get('type')
+        customer_id = self.request.query_params.get('customer')
+        project_id  = self.request.query_params.get('project')
+
         if booking_id:
             qs = qs.filter(booking_id=booking_id)
         if doc_type:
             qs = qs.filter(document_type=doc_type)
+        if customer_id:
+            qs = qs.filter(customer_id=customer_id)
+        if project_id:
+            qs = qs.filter(project_id=project_id)
+
         return qs
 
 
 class ERPDocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = ERPDocument.objects.all()
     serializer_class = ERPDocumentSerializer
+
+    def get_queryset(self):
+        return ERPDocument.objects.select_related(
+            'booking', 'project', 'customer', 'created_by'
+        )
 
 
 class ERPDocumentCreateView(generics.CreateAPIView):
-    queryset = ERPDocument.objects.all()
     serializer_class = ERPDocumentSerializer
 
+    def get_queryset(self):
+        return ERPDocument.objects.select_related(
+            'booking', 'project', 'customer', 'created_by'
+        )
 
 # =====================================================
 # 23. COMPANY ASSET VIEWS
@@ -1976,13 +1995,48 @@ class ERPCompanyAssetCreateView(generics.CreateAPIView):
 # =====================================================
 
 class ERPSystemLogListView(generics.ListAPIView):
-    queryset = ERPSystemLog.objects.all()
     serializer_class = ERPSystemLogSerializer
+
+    def get_queryset(self):
+        # ✅ select_related
+        qs = ERPSystemLog.objects.select_related('user').all()
+
+        log_level = self.request.query_params.get('level')
+        module    = self.request.query_params.get('module')
+        user_id   = self.request.query_params.get('user')
+
+        if log_level:
+            qs = qs.filter(log_level=log_level)
+        if module:
+            qs = qs.filter(module=module)
+        if user_id:
+            qs = qs.filter(user_id=user_id)
+
+        return qs
+
+
+# ✅ Detail view যোগ করা হয়েছে — শুধু GET
+class ERPSystemLogDetailView(generics.RetrieveAPIView):
+    serializer_class = ERPSystemLogSerializer
+
+    def get_queryset(self):
+        return ERPSystemLog.objects.select_related('user')
 
 
 class ERPSystemLogCreateView(generics.CreateAPIView):
-    queryset = ERPSystemLog.objects.all()
     serializer_class = ERPSystemLogSerializer
+
+    def get_queryset(self):
+        return ERPSystemLog.objects.select_related('user')
+
+    # ✅ IP address auto-capture
+    def perform_create(self, serializer):
+        ip = self.request.META.get('HTTP_X_FORWARDED_FOR')
+        if ip:
+            ip = ip.split(',')[0].strip()
+        else:
+            ip = self.request.META.get('REMOTE_ADDR')
+        serializer.save(ip_address=ip)
 
 
 # =====================================================

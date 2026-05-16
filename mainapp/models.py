@@ -1758,14 +1758,30 @@ class ERPDocument(models.Model):
     id = models.BigAutoField(primary_key=True)
     document_type = models.CharField(max_length=30, choices=DOCUMENT_TYPE_CHOICES)
     title = models.CharField(max_length=200)
-    booking = models.ForeignKey(ERPBooking, on_delete=models.SET_NULL, null=True, blank=True, related_name='documents')
-    project = models.ForeignKey(ERPProject, on_delete=models.SET_NULL, null=True, blank=True, related_name='documents')
-    customer = models.ForeignKey(ERPCustomer, on_delete=models.SET_NULL, null=True, blank=True, related_name='documents')
+    booking = models.ForeignKey(
+        ERPBooking, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='documents'
+    )
+    project = models.ForeignKey(
+        ERPProject, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='documents'
+    )
+    customer = models.ForeignKey(
+        ERPCustomer, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='documents'
+    )
     file = models.FileField(upload_to='erp/documents/', blank=True, null=True)
     notes = models.TextField(blank=True, null=True, default='')
-    is_signed = models.BooleanField(default=True)
-    e_sign = models.BooleanField(default=True)
-    created_by = models.CharField(max_length=100, blank=True, null=True, default='')
+
+    # ✅ default=False
+    is_signed = models.BooleanField(default=False)
+    e_sign    = models.BooleanField(default=False)
+
+    # ✅ CharField → FK
+    created_by = models.ForeignKey(
+        'ERPUser', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='created_documents'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1774,8 +1790,6 @@ class ERPDocument(models.Model):
 
     def __str__(self):
         return f'{self.document_type} - {self.title}'
-
-
 # =====================================================
 # 23. COMPANY ASSET (Logistics) (DONE)
 # =====================================================
@@ -1818,13 +1832,16 @@ class ERPSystemLog(models.Model):
     ]
 
     id = models.BigAutoField(primary_key=True)
-    user = models.ForeignKey(ERPUser, on_delete=models.SET_NULL, null=True, blank=True)
-    action = models.CharField(max_length=200)
-    module = models.CharField(max_length=100)
+    user = models.ForeignKey(
+        ERPUser, on_delete=models.SET_NULL,
+        null=True, blank=True
+    )
+    action      = models.CharField(max_length=200)
+    module      = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True, default='')
-    ip_address = models.GenericIPAddressField(blank=True, null=True)
-    log_level = models.CharField(max_length=20, choices=LOG_LEVEL_CHOICES, default='info')
-    created_at = models.DateTimeField(auto_now_add=True)
+    ip_address  = models.GenericIPAddressField(blank=True, null=True)
+    log_level   = models.CharField(max_length=20, choices=LOG_LEVEL_CHOICES, default='info')
+    created_at  = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-created_at']

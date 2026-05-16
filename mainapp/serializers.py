@@ -616,16 +616,42 @@ class ERPSMSLogSerializer(serializers.ModelSerializer):
 # ===== 22. DOCUMENT =====
 
 class ERPDocumentSerializer(serializers.ModelSerializer):
-    customer_name = serializers.ReadOnlyField(source='customer.full_name')
-    booking_code = serializers.ReadOnlyField(source='booking.booking_code')
-    project_name = serializers.ReadOnlyField(source='project.project_name')
+    # ✅ null check সহ
+    customer_name         = serializers.SerializerMethodField()
+    booking_code          = serializers.SerializerMethodField()
+    project_name          = serializers.SerializerMethodField()
+    created_by_name       = serializers.SerializerMethodField()
     document_type_display = serializers.SerializerMethodField()
 
     class Meta:
-        model = ERPDocument
+        model  = ERPDocument
         fields = '__all__'
 
-    def get_document_type_display(self, obj): return obj.get_document_type_display()
+    def get_customer_name(self, obj):
+        return obj.customer.full_name if obj.customer else None
+
+    def get_booking_code(self, obj):
+        return obj.booking.booking_code if obj.booking else None
+
+    def get_project_name(self, obj):
+        return obj.project.project_name if obj.project else None
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.full_name if obj.created_by else None
+
+    def get_document_type_display(self, obj):
+        return obj.get_document_type_display()
+
+    # ✅ file type validation
+    def validate_file(self, value):
+        if value:
+            allowed = ['.pdf', '.jpg', '.jpeg', '.png']
+            ext = os.path.splitext(value.name)[1].lower()
+            if ext not in allowed:
+                raise serializers.ValidationError(
+                    'Only PDF and image files (.pdf, .jpg, .jpeg, .png) are allowed.'
+                )
+        return value
 
 
 # ===== 23. COMPANY ASSET =====
@@ -645,16 +671,18 @@ class ERPCompanyAssetSerializer(serializers.ModelSerializer):
 # ===== 24. SYSTEM LOG =====
 
 class ERPSystemLogSerializer(serializers.ModelSerializer):
-    user_name = serializers.SerializerMethodField()
+    user_name         = serializers.SerializerMethodField()
     log_level_display = serializers.SerializerMethodField()
 
     class Meta:
-        model = ERPSystemLog
+        model  = ERPSystemLog
         fields = '__all__'
 
-    def get_user_name(self, obj): return obj.user.full_name if obj.user else None
-    def get_log_level_display(self, obj): return obj.get_log_level_display()
+    def get_user_name(self, obj):
+        return obj.user.full_name if obj.user else None
 
+    def get_log_level_display(self, obj):
+        return obj.get_log_level_display()
 
 #======================================================
 # 25.             LAND MANAGEMENT

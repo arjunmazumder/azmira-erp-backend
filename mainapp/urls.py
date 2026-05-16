@@ -157,6 +157,7 @@ from mainapp.views import (
     # 24. System Log
     ERPSystemLogListView,
     ERPSystemLogCreateView,
+    ERPSystemLogDetailView,
     
 
     # 25. Land Management
@@ -397,8 +398,8 @@ urlpatterns = [
     # ?booking=<id>&type=<doc_type>
     # =====================================================
     path('erp-documents/', ERPDocumentListView.as_view(), name='erp-document-list'),
-    path('erp-documents/<int:pk>/', ERPDocumentDetailView.as_view(), name='erp-document-detail'),
     path('erp-documents/new/', ERPDocumentCreateView.as_view(), name='erp-document-create'),
+    path('erp-documents/<int:pk>/', ERPDocumentDetailView.as_view(), name='erp-document-detail'),
 
     # =====================================================
     # 23. COMPANY ASSETS (Logistics)
@@ -413,6 +414,7 @@ urlpatterns = [
     # =====================================================
     path('erp-system-logs/', ERPSystemLogListView.as_view(), name='erp-system-log-list'),
     path('erp-system-logs/new/', ERPSystemLogCreateView.as_view(), name='erp-system-log-create'),
+    path('erp-system-logs/<int:pk>/', ERPSystemLogDetailView.as_view(), name='erp-system-log-detail'),
 
     #======================================================
     # 25.             LAND MANAGEMENT
