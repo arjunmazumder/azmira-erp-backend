@@ -22,11 +22,44 @@ from django.db.models import Sum
 
 # models.py
 
+
+import os
+from io import BytesIO
+from PIL import Image
 from django.db import models
+from django.core.files.base import ContentFile
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 
+# =====================================================
+# USER MANAGER (Custom User তৈরির জন্য এটি জরুরি)
+# =====================================================
+class ERPUserManager(BaseUserManager):
+    def create_user(self, username, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError('The Email field must be set')
+        email = self.normalize_email(email)
+        user = self.model(username=username, email=email, **extra_fields)
+        if password:
+            user.set_password(password)  # এটি পাসওয়ার্ডকে হ্যাশ করে সেভ করবে
+        user.save(using=self._db)
+        return user
 
-class ERPUser(models.Model):
+    def create_superuser(self, username, email, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_active', True)
 
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+
+        return self.create_user(username, email, password, **extra_fields)
+
+# =====================================================
+# MAIN USER MODEL
+# =====================================================
+class ERPUser(AbstractBaseUser, PermissionsMixin):
     ROLE_CHOICES = [
         ('super_admin', 'Super Admin'),
         ('admin', 'Admin'),
@@ -50,42 +83,36 @@ class ERPUser(models.Model):
     ]
 
     id = models.BigAutoField(primary_key=True)
-
-    username = models.CharField(max_length=150,unique=True)
-
-    email = models.EmailField(max_length=254,unique=True)
-
-    password_hash = models.CharField(max_length=255,blank=True,null=True,default='')
-
+    username = models.CharField(max_length=150, unique=True)
+    email = models.EmailField(max_length=254, unique=True)
+    
+    # জ্যাঙ্গোর ডিফল্ট password ফিল্ড AbstractBaseUser এ থাকে, 
+    # তাই আলাদা করে password_hash রাখার প্রয়োজন নেই।
+    
     full_name = models.CharField(max_length=200)
+    phone = models.CharField(max_length=20, blank=True, null=True, default='')
+    address = models.TextField(blank=True, null=True, default='')
+    nid = models.CharField(max_length=50, blank=True, null=True, default='')
+    date_of_birth = models.DateField(blank=True, null=True)
+    image = models.ImageField(upload_to='erp/users/', blank=True, null=True)
 
-    phone = models.CharField(max_length=20,blank=True,null=True,default='')
+    roles = models.JSONField(default=list, blank=True, null=True)
+    department = models.CharField(max_length=50, choices=DEPARTMENT_CHOICES, blank=True, null=True, default='')
+    employee_id = models.CharField(max_length=50, blank=True, null=True, default='')
 
-    address = models.TextField(blank=True,null=True,default='')
-
-    nid = models.CharField(max_length=50,blank=True,null=True,default='')
-
-    date_of_birth = models.DateField(blank=True,null=True)
-
-    image = models.ImageField(upload_to='erp/users/',blank=True,null=True)
-
-    # Multiple roles
-    roles = models.JSONField(default=list,blank=True,null=True)
-
-    department = models.CharField(max_length=50,choices=DEPARTMENT_CHOICES,blank=True,null=True,default='')
-
-    employee_id = models.CharField(max_length=50,blank=True,null=True,default='')
-
-    # Default TRUE fields
+    # জ্যাঙ্গোর জন্য প্রয়োজনীয় স্ট্যাটাস ফিল্ডস
     is_active = models.BooleanField(default=True)
-
-    last_login = models.DateTimeField(blank=True,null=True)
-
+    is_staff = models.BooleanField(default=False) # অ্যাডমিন প্যানেলে লগইনের জন্য
+    
+    last_login = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
     updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.CharField(max_length=100, blank=True, null=True, default='')
 
-    created_by = models.CharField(max_length=100,blank=True,null=True,default='')
+    objects = ERPUserManager()
+
+    USERNAME_FIELD = 'username' # ইউনিক আইডেন্টিফায়ার
+    REQUIRED_FIELDS = ['email', 'full_name'] # সুপারইউজার তৈরির সময় যা যা ইনপুট দিতে হবে
 
     class Meta:
         ordering = ['-created_at']
@@ -101,7 +128,6 @@ class ERPUser(models.Model):
     # =====================================================
     # DYNAMIC FLAGS
     # =====================================================
-
     @property
     def is_customer(self):
         return 'customer' in (self.roles or [])
@@ -118,44 +144,28 @@ class ERPUser(models.Model):
         )
 
     # =====================================================
-    # IMAGE CONVERSION
+    # IMAGE CONVERSION (WebP)
     # =====================================================
-
     def save(self, *args, **kwargs):
-
         if self.image and hasattr(self.image, 'file'):
-
             try:
                 img = Image.open(self.image)
-
                 if img.mode in ('RGBA', 'P'):
                     img = img.convert('RGB')
 
                 img_io = BytesIO()
+                img.save(img_io, format='WEBP', quality=80)
 
-                img.save(
-                    img_io,
-                    format='WEBP',
-                    quality=80
-                )
-
-                new_filename = (
-                    os.path.splitext(self.image.name)[0]
-                    + '.webp'
-                )
-
+                new_filename = os.path.splitext(self.image.name)[0] + '.webp'
                 self.image.save(
                     new_filename,
                     ContentFile(img_io.getvalue()),
                     save=False
                 )
-
             except Exception as e:
                 print('Image conversion failed:', e)
 
         super().save(*args, **kwargs)
-
-
 # =====================================================
 # 2. PROJECT*************************(DONE)
 # =====================================================
@@ -1129,49 +1139,19 @@ class ERPInvestor(models.Model):
     id = models.BigAutoField(primary_key=True)
     user = models.OneToOneField(ERPUser, on_delete=models.CASCADE, related_name='investor_profile')
     investor_code = models.CharField(max_length=50, unique=True)
-    marketing_officer = models.ForeignKey(
-    'ERPMarketingOfficer',
-    on_delete=models.SET_NULL,
-    null=True,
-    blank=True,
-    related_name='investors'   # ✅ CHANGE THIS
-    )
+    marketing_officer = models.ForeignKey('ERPMarketingOfficer',on_delete=models.SET_NULL,null=True,blank=True,related_name='investors')
     bank_name = models.CharField(max_length=100, blank=True, null=True, default='')
     bank_account = models.CharField(max_length=50, blank=True, null=True, default='')
     bank_branch = models.CharField(max_length=100, blank=True, null=True, default='')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    address = models.TextField(
-    blank=True,
-    null=True,
-    default=''
-    )
-    phone_number = models.CharField(
-    max_length=255,
-    blank=True,
-    null=True
-    )
-    email = models.EmailField(
-        max_length=255,
-        blank=True,
-        null=True
-    )
-    nid_number = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True
-    )
-    nominee_details = models.TextField(
-        max_length=255,
-        blank=True,
-        null=True
-    )
-    bank_account_details = models.TextField(
-        blank=True,
-        null=True,
-        default=''
-    )
+    address = models.TextField(blank=True,null=True,default='')
+    phone_number = models.CharField(max_length=255,blank=True,null=True)
+    email = models.EmailField(max_length=255,blank=True,null=True)
+    nid_number = models.CharField(max_length=255,blank=True,null=True)
+    nominee_details = models.TextField(max_length=255,blank=True,null=True)
+    bank_account_details = models.TextField(blank=True,null=True,default='')
 
     def __str__(self):
         return f'{self.investor_code} - {self.user.full_name}'
@@ -1192,150 +1172,33 @@ class ERPInvestment(models.Model):
     ]
 
     id = models.BigAutoField(primary_key=True)
-
-    investor = models.ForeignKey(
-        'ERPInvestor',
-        on_delete=models.CASCADE,
-        related_name='investments'
-    )
-
-    project = models.ForeignKey(
-        'ERPProject',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='investments'
-    )
-
-    invest_amount = models.DecimalField(
-        max_digits=16,
-        decimal_places=2
-    )
-
+    investor = models.ForeignKey('ERPInvestor',on_delete=models.CASCADE,related_name='investments')
+    project = models.ForeignKey('ERPProject',on_delete=models.SET_NULL,null=True,blank=True,related_name='investments')
+    invest_amount = models.DecimalField(max_digits=16,decimal_places=2)
     invest_date = models.DateField(default=date.today)
-
-    maturity_date = models.DateField(
-        blank=True,
-        null=True
-    )
-
-    monthly_dividend_rate = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=0
-    )
-
-    total_profit_received = models.DecimalField(
-        max_digits=16,
-        decimal_places=2,
-        default=0
-    )
-
-    agreement_number = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-        default=''
-    )
-
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default='active'
-    )
-
-    cancellation_date = models.DateField(
-        blank=True,
-        null=True
-    )
-
-    cancellation_note = models.TextField(
-        blank=True,
-        null=True,
-        default=''
-    )
-
-    transferred_to_project = models.ForeignKey(
-        'ERPProject',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='transferred_investments'
-    )
-
-    transfer_date = models.DateField(
-        blank=True,
-        null=True
-    )
-
-    transfer_service_charge = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=0
-    )
-
-    notes = models.TextField(
-        blank=True,
-        null=True,
-        default=''
-    )
-
+    maturity_date = models.DateField(blank=True,null=True)
+    monthly_dividend_rate = models.DecimalField(max_digits=5,decimal_places=2,default=0)
+    total_profit_received = models.DecimalField(max_digits=16,decimal_places=2,default=0)
+    agreement_number = models.CharField(max_length=100,blank=True,null=True,default='')
+    status = models.CharField(max_length=20,choices=STATUS_CHOICES,default='active')
+    cancellation_date = models.DateField(blank=True,null=True)
+    cancellation_note = models.TextField(blank=True,null=True,default='')
+    transferred_to_project = models.ForeignKey('ERPProject',on_delete=models.SET_NULL,null=True,blank=True,related_name='transferred_investments')
+    transfer_date = models.DateField(blank=True,null=True)
+    transfer_service_charge = models.DecimalField(max_digits=12,decimal_places=2,default=0)
+    notes = models.TextField(blank=True,null=True,default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
-    investment_id = models.CharField(
-    max_length=50,
-    unique=True,
-    blank=True,
-    null=True
-    )
-
-    duration = models.CharField(
-        max_length=50,
-        default='12 Months'
-    )
-
-    terms_conditions = models.TextField(
-        blank=True,
-        null=True
-    )
-
-    partial_return_amount = models.DecimalField(
-        max_digits=15,
-        decimal_places=2,
-        default=0.00
-    )
-
-    amount_returned = models.DecimalField(
-        max_digits=15,
-        decimal_places=2,
-        default=0.00
-    )
-
-    dividend_payment_method = models.CharField(
-        max_length=20,
-        choices=PAYMENT_METHODS,
-        default='bank_transfer'
-    )
-
-    partial_return_date = models.DateField(
-        blank=True,
-        null=True
-    )
-
-    full_return_date = models.DateField(
-        blank=True,
-        null=True
-    )
-
-    documents = models.FileField(
-        upload_to='investments/docs/',
-        blank=True,
-        null=True
-    )
-
+    investment_id = models.CharField(max_length=50,unique=True,blank=True,null=True)
+    duration = models.CharField(max_length=50,default='12 Months')
+    terms_conditions = models.TextField(blank=True,null=True)
+    partial_return_amount = models.DecimalField(max_digits=15,decimal_places=2,default=0.00)
+    amount_returned = models.DecimalField(max_digits=15,decimal_places=2,default=0.00)
+    dividend_payment_method = models.CharField(max_length=20,choices=PAYMENT_METHODS,default='bank_transfer')
+    partial_return_date = models.DateField(blank=True,null=True)
+    full_return_date = models.DateField(blank=True,null=True)
+    documents = models.FileField(upload_to='investments/docs/',blank=True,null=True)
     audit_trail = models.JSONField(default=dict)
-
     @property
     def remaining_investment(self):
         return self.invest_amount - self.amount_returned
@@ -1821,8 +1684,8 @@ class ERPLandOwner(models.Model):
     power_of_attorney_doc    = models.FileField(
         upload_to='erp/land/attorney/', blank=True, null=True
     )
-    created_at               = models.DateTimeField(auto_now_add=True)
-    updated_at               = models.DateTimeField(auto_now=True)
+    created_at= models.DateTimeField(auto_now_add=True)
+    updated_at= models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.full_name
@@ -1834,45 +1697,31 @@ class ERPLandAcquisition(models.Model):
         ('saf_kabala',        'Saf-Kabala'),
     ]
 
-    id                  = models.BigAutoField(primary_key=True)
-    acquisition_code    = models.CharField(max_length=50, unique=True)  # e.g. ACL-Land-0001
-    supplier            = models.ForeignKey(
-        ERPSupplier, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='land_acquisitions'
-    )
-    land_owner          = models.ForeignKey(
-        ERPLandOwner, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='land_acquisitions'
-    )
+    id= models.BigAutoField(primary_key=True)
+    acquisition_code= models.CharField(max_length=50, unique=True)  # e.g. ACL-Land-0001
+    supplier= models.ForeignKey(ERPSupplier, on_delete=models.SET_NULL,null=True, blank=True, related_name='land_acquisitions')
+    land_owner= models.ForeignKey(ERPLandOwner, on_delete=models.SET_NULL,null=True, blank=True, related_name='land_acquisitions')
 
     # Khatiyan info
-    khatiyan_number     = models.CharField(max_length=100, blank=True, null=True, default='')
+    khatiyan_number= models.CharField(max_length=100, blank=True, null=True, default='')
 
     # Area & price
-    total_area          = models.DecimalField(max_digits=14, decimal_places=4, default=0)  # Decimal SA,CS,RS,BRS
-    price_per_decimal   = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    total_value         = models.DecimalField(max_digits=16, decimal_places=2, default=0)
-    area_purchased      = models.DecimalField(max_digits=14, decimal_places=4, default=0)
-    amount_paid         = models.DecimalField(max_digits=16, decimal_places=2, default=0)
-    outstanding_amount  = models.DecimalField(max_digits=16, decimal_places=2, default=0)
-    total_paid          = models.DecimalField(max_digits=16, decimal_places=2, default=0)
-
+    total_area= models.DecimalField(max_digits=14, decimal_places=4, default=0)  # Decimal SA,CS,RS,BRS
+    price_per_decimal  = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_value= models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    area_purchased= models.DecimalField(max_digits=14, decimal_places=4, default=0)
+    amount_paid= models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    outstanding_amount = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    total_paid= models.DecimalField(max_digits=16, decimal_places=2, default=0)
     # Status
-    land_status         = models.CharField(
-        max_length=30, choices=LAND_STATUS_CHOICES,
-        default='power_of_attorney'
-    )
-    is_mutated          = models.BooleanField(default=False)   # mutation done?
-    is_surveyed         = models.BooleanField(default=False)   # surveyed?
-
+    land_status= models.CharField(max_length=30, choices=LAND_STATUS_CHOICES,default='power_of_attorney')
+    is_mutated= models.BooleanField(default=False)   # mutation done?
+    is_surveyed= models.BooleanField(default=False)   # surveyed?
     # Documents
-    related_documents   = models.FileField(
-        upload_to='erp/land/documents/', blank=True, null=True
-    )
-
-    created_by          = models.CharField(max_length=100, blank=True, null=True, default='')
-    created_at          = models.DateTimeField(auto_now_add=True)
-    updated_at          = models.DateTimeField(auto_now=True)
+    related_documents = models.FileField(upload_to='erp/land/documents/', blank=True, null=True)
+    created_by= models.CharField(max_length=100, blank=True, null=True, default='')
+    created_at= models.DateTimeField(auto_now_add=True)
+    updated_at= models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f'{self.acquisition_code}'

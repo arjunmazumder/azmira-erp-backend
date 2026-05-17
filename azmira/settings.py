@@ -10,8 +10,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-ol$9)r6^fs$k)^2al^^ru9i*(ufe)fxfre^izt8-ytlhx$90o9'
 
-DEBUG = True
-AUTH_USER_MODEL = 'users.User'
+# DEBUG = True
+# AUTH_USER_MODEL = 'users.User'
+AUTH_USER_MODEL = 'mainapp.ERPUser'
 
 ALLOWED_HOSTS = ['*']
 
