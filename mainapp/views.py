@@ -149,7 +149,6 @@ def erp_user_login(request):
 
     # ১. ইউজার অথেন্টিকেট করা (এটি হ্যাশ করা পাসওয়ার্ড অটোমেটিক চেক করবে)
     user = authenticate(username=username, password=password)
-    user1 = ERPUser.objects.get(username='pata12')
 
     if user is not None:
         if user.is_active:
