@@ -94,6 +94,7 @@ class ERPUser(AbstractBaseUser, PermissionsMixin):
     address = models.TextField(blank=True, null=True, default='')
     nid = models.CharField(max_length=50, blank=True, null=True, default='')
     date_of_birth = models.DateField(blank=True, null=True)
+    is_active=models.BooleanField(default=True)
     image = models.ImageField(upload_to='erp/users/', blank=True, null=True)
 
     roles = models.JSONField(default=list, blank=True, null=True)
@@ -112,7 +113,7 @@ class ERPUser(AbstractBaseUser, PermissionsMixin):
     objects = ERPUserManager()
 
     USERNAME_FIELD = 'username' # ইউনিক আইডেন্টিফায়ার
-    REQUIRED_FIELDS = ['email', 'full_name'] # সুপারইউজার তৈরির সময় যা যা ইনপুট দিতে হবে
+    REQUIRED_FIELDS = ['email','full_name'] # সুপারইউজার তৈরির সময় যা যা ইনপুট দিতে হবে
 
     class Meta:
         ordering = ['-created_at']
@@ -166,6 +167,8 @@ class ERPUser(AbstractBaseUser, PermissionsMixin):
                 print('Image conversion failed:', e)
 
         super().save(*args, **kwargs)
+
+
 # =====================================================
 # 2. PROJECT*************************(DONE)
 # =====================================================

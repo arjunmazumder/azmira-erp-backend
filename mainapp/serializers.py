@@ -14,62 +14,58 @@ from mainapp.models import (
 
 # ===== 1. USER =====
 
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import make_password
 
-# class ERPUserSerializer(serializers.ModelSerializer):
-#     # roles এখন লিস্ট, তাই আমরা ম্যানুয়ালি এটি ডিসপ্লে করার জন্য মেথড লিখব
-#     role_display = serializers.SerializerMethodField()
-#     department_display = serializers.SerializerMethodField()
+User = get_user_model()
 
-#     class Meta:
-#         model = ERPUser
-#         fields = '__all__'
-#         extra_kwargs = {'password_hash': {'write_only': True}}
-
-#     def get_role_display(self, obj):
-#         # JSONField/List এর জন্য কাস্টম ডিসপ্লে লজিক
-#         if obj.roles:
-#             # আন্ডারস্কোর বাদ দিয়ে এবং টাইটেল কেস করে দেখাবে (যেমন: admin -> Admin)
-#             return ", ".join([r.replace('_', ' ').title() for r in obj.roles])
-#         return "No Role"
-
-#     def get_department_display(self, obj):
-#         # Department এখনো ChoiceField তাই এটি কাজ করবে
-#         return obj.get_department_display() if obj.department else None
-
-
+# =====================================================
+# ১. ইউজার লিস্ট দেখার জন্য সিরিয়ালাইজার
+# =====================================================
 class ERPUserListSerializer(serializers.ModelSerializer):
-    # লিস্ট ভিউতে 'role' এর বদলে 'roles' ব্যবহার করতে হবে
     role_display = serializers.SerializerMethodField()
 
     class Meta:
-        model = ERPUser
-        fields = ['id', 'username', 'full_name', 'email', 'roles', 'role_display', 'department', 'is_active']
+        model = User
+        fields = [
+            'id', 'username', 'full_name', 'email', 
+            'roles', 'role_display', 'department', 'is_active'
+        ]
 
     def get_role_display(self, obj):
         if obj.roles:
+            # role_name_example -> Role Name Example
             return ", ".join([r.replace('_', ' ').title() for r in obj.roles])
         return "N/A"
 
 
+# =====================================================
+# ২. ইউজারের ডিটেইলস এবং প্রোফাইল দেখার জন্য
+# =====================================================
 class ERPUserSerializer(serializers.ModelSerializer):
-    is_customer = serializers.SerializerMethodField()
-    is_investor = serializers.SerializerMethodField()
-    is_marketing = serializers.SerializerMethodField()
-    department_display = serializers.SerializerMethodField()
-    class Meta:
-        model = ERPUser
-        fields = '__all__'
-        extra_kwargs = {'password_hash': {'write_only': True}}
+    is_customer = serializers.ReadOnlyField()
+    is_investor = serializers.ReadOnlyField()
+    is_marketing = serializers.ReadOnlyField()
+    department_display = serializers.CharField(source='get_department_display', read_only=True)
 
-    def get_is_customer(self, obj): return obj.is_customer
-    def get_is_investor(self, obj): return obj.is_investor
-    def get_is_marketing(self, obj): return obj.is_marketing
-    def get_department_display(self, obj):
-        return obj.get_department_display() if obj.department else None
+    class Meta:
+        model = User
+        # সব ফিল্ড দেখাবে কিন্তু পাসওয়ার্ড হাইড থাকবে
+        fields = '__all__'
+        extra_kwargs = {
+            'password': {'write_only': True},
+        }
+
+
+# =====================================================
+# ৩. নতুন ইউজার তৈরি করার জন্য (রেজিস্ট্রেশন)
+# =====================================================
 
 class ERPUserCreateSerializer(serializers.ModelSerializer):
+    # পাসওয়ার্ড এবং অন্যান্য ফিল্ড ডিফাইন করা
+    password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
     is_active = serializers.BooleanField(default=True, required=False)
-    password = serializers.CharField(write_only=True, required=False)
     roles = serializers.ListField(
         child=serializers.CharField(),
         required=False,
@@ -77,22 +73,32 @@ class ERPUserCreateSerializer(serializers.ModelSerializer):
     )
 
     class Meta:
-        model = ERPUser
+        model = User # এখানে User = get_user_model() নিশ্চিত করুন
+        # __all__ ব্যবহার না করে নির্দিষ্ট ফিল্ডগুলো লিখে দিন
         fields = [
             'id', 'username', 'email', 'password', 'full_name', 'phone',
             'address', 'nid', 'date_of_birth', 'image', 'roles',
-            'department', 'employee_id', 'is_active',
-            # is_customer, is_investor, is_marketing বাদ — এগুলো property
+            'department', 'employee_id', 'is_active'
         ]
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
-        user = ERPUser.objects.create(**validated_data)
+        # ইউজার অবজেক্ট তৈরি
+        user = User(**validated_data)
         if password:
-            user.password_hash = make_password(password)
-            user.save(update_fields=['password_hash'])
+            user.set_password(password) # পাসওয়ার্ড হ্যাশ করার জন্য এটি বাধ্যতামূলক
+        user.save()
         return user
-    
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop('password', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if password:
+            instance.set_password(password)
+        instance.save()
+        return instance
+
 
 # ===== 2. PROJECT =====
 

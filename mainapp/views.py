@@ -99,6 +99,12 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from core.filters import ERPLandAcquisitionFilter, ERPPlotFilter, ERPProjectFilter
+from django.contrib.auth import authenticate
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework import status
 
 # =====================================================
 # 1. USER & AUTH VIEWS
@@ -138,51 +144,33 @@ class ERPUserCreateView(generics.CreateAPIView):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def erp_user_login(request):
-    """POST /api/erp-users/login/"""
     username = request.data.get('username')
     password = request.data.get('password')
 
-    if not username or not password:
-        return Response(
-            {'success': False, 'message': 'Username and password required'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    # ১. ইউজার অথেন্টিকেট করা (এটি হ্যাশ করা পাসওয়ার্ড অটোমেটিক চেক করবে)
+    user = authenticate(username=username, password=password)
+    user1 = ERPUser.objects.get(username='pata12')
 
-    try:
-        user = ERPUser.objects.get(username=username)
-
-        if check_password(password, user.password_hash):
-            if not user.is_active:
-                return Response(
-                    {'success': False, 'message': 'Account is deactivated'},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-
-            user.last_login = datetime.now()
-            user.save(update_fields=['last_login'])
-
+    if user is not None:
+        if user.is_active:
+            # ২. টোকেন তৈরি করা
             refresh = RefreshToken.for_user(user)
-
             return Response({
-                'success': True,
-                'message': 'Login successful',
-                'tokens': {
-                    'refresh': str(refresh),
-                    'access': str(refresh.access_token),
-                },
-                'user': ERPUserSerializer(user).data
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'full_name': user.full_name,
+                    'roles': user.roles
+                }
             }, status=status.HTTP_200_OK)
-
-        return Response(
-            {'success': False, 'message': 'Invalid password'},
-            status=status.HTTP_401_UNAUTHORIZED
-        )
-
-    except ERPUser.DoesNotExist:
-        return Response(
-            {'success': False, 'message': 'User not found'},
-            status=status.HTTP_404_NOT_FOUND
-        )
+        else:
+            return Response({'error': 'Account is disabled'}, status=status.HTTP_403_FORBIDDEN)
+    else:
+        # ভুল ইউজারনেম বা পাসওয়ার্ড হলে
+        return Response({'error': 'Invalid username or password'}, status=status.HTTP_401_UNAUTHORIZED)
+    
 
 
 class ERPUserByRoleView(generics.ListAPIView):
