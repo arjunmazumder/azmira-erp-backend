@@ -59,6 +59,7 @@ class ERPUserManager(BaseUserManager):
 # =====================================================
 # MAIN USER MODEL
 # =====================================================
+
 class ERPUser(AbstractBaseUser, PermissionsMixin):
     ROLE_CHOICES = [
         ('super_admin', 'Super Admin'),
@@ -85,42 +86,29 @@ class ERPUser(AbstractBaseUser, PermissionsMixin):
     id = models.BigAutoField(primary_key=True)
     username = models.CharField(max_length=150, unique=True)
     email = models.EmailField(max_length=254, unique=True)
-    
-    # জ্যাঙ্গোর ডিফল্ট password ফিল্ড AbstractBaseUser এ থাকে, 
-    # তাই আলাদা করে password_hash রাখার প্রয়োজন নেই।
-    
     full_name = models.CharField(max_length=200)
     phone = models.CharField(max_length=20, blank=True, null=True, default='')
     address = models.TextField(blank=True, null=True, default='')
     nid = models.CharField(max_length=50, blank=True, null=True, default='')
     date_of_birth = models.DateField(blank=True, null=True)
-    is_active=models.BooleanField(default=True)
     image = models.ImageField(upload_to='erp/users/', blank=True, null=True)
-
     roles = models.JSONField(default=list, blank=True, null=True)
     department = models.CharField(max_length=50, choices=DEPARTMENT_CHOICES, blank=True, null=True, default='')
-    employee_id = models.CharField(max_length=50, blank=True, null=True, default='')
-
-    # জ্যাঙ্গোর জন্য প্রয়োজনীয় স্ট্যাটাস ফিল্ডস
     is_active = models.BooleanField(default=True)
-    is_staff = models.BooleanField(default=False) # অ্যাডমিন প্যানেলে লগইনের জন্য
-    
+    is_staff = models.BooleanField(default=False) 
     last_login = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.CharField(max_length=100, blank=True, null=True, default='')
-
     objects = ERPUserManager()
-
-    USERNAME_FIELD = 'username' # ইউনিক আইডেন্টিফায়ার
-    REQUIRED_FIELDS = ['email','full_name'] # সুপারইউজার তৈরির সময় যা যা ইনপুট দিতে হবে
+    referred_by = models.CharField(max_length=255, blank=True, null=True)
+    USERNAME_FIELD = 'username'
+    REQUIRED_FIELDS = ['email','full_name']
 
     class Meta:
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['username']),
             models.Index(fields=['email']),
-            models.Index(fields=['employee_id']),
         ]
 
     def __str__(self):
@@ -136,6 +124,10 @@ class ERPUser(AbstractBaseUser, PermissionsMixin):
     @property
     def is_investor(self):
         return 'investor' in (self.roles or [])
+
+    @property
+    def is_employee(self):
+        return 'employee' in (self.roles or [])
 
     @property
     def is_marketing(self):
@@ -175,8 +167,8 @@ class ERPUser(AbstractBaseUser, PermissionsMixin):
 
 class ERPProject(models.Model):
     PROJECT_TYPE_CHOICES = [
-        ('plot', 'Plot/Lot'),
-        ('flat', 'Flat/Apartment'),
+        ('plot', 'Plot'),
+        ('flat', 'Flat'),
         ('investment', 'Investment'),
         ('commercial', 'Commercial'),
         ('mixed', 'Mixed'),
@@ -237,7 +229,7 @@ class ERPProject(models.Model):
 
 
 # =====================================================
-# 3. PLOT / FLAT / PLOT******************(DONE)
+# 3. PLOT / FLAT ******************(DONE)
 # =====================================================
 
 class ERPPlot(models.Model):
@@ -410,7 +402,7 @@ class ERPCustomer(models.Model):
     source = models.CharField(max_length=30, choices=SOURCE_CHOICES, default='walk_in')
     referred_by = models.ForeignKey(
         'ERPUser', on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='referred_customers'
+        null=True, blank=True,unique=True, related_name='referred_customers'
     )
     loyalty_points = models.IntegerField(default=0)
     profile_image = models.ImageField(upload_to='erp/customers/', blank=True, null=True, default='')
@@ -420,6 +412,8 @@ class ERPCustomer(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.CharField(max_length=100, blank=True, null=True, default='')
+    REQUIRED_FIELDS = ['referred_by','full_name','phone']
+
 
     class Meta:
         ordering = ['-created_at']

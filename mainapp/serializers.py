@@ -27,11 +27,8 @@ class ERPUserListSerializer(serializers.ModelSerializer):
     role_display = serializers.SerializerMethodField()
 
     class Meta:
-        model = User
-        fields = [
-            'id', 'username', 'full_name', 'email', 
-            'roles', 'role_display', 'department', 'is_active'
-        ]
+        model = ERPUser
+        fields = '__all__'
 
     def get_role_display(self, obj):
         if obj.roles:
@@ -46,12 +43,12 @@ class ERPUserListSerializer(serializers.ModelSerializer):
 class ERPUserSerializer(serializers.ModelSerializer):
     is_customer = serializers.ReadOnlyField()
     is_investor = serializers.ReadOnlyField()
-    is_marketing = serializers.ReadOnlyField()
+    is_marketingOfficer = serializers.ReadOnlyField()
+    is_employee = serializers.ReadOnlyField()
     department_display = serializers.CharField(source='get_department_display', read_only=True)
 
     class Meta:
-        model = User
-        # সব ফিল্ড দেখাবে কিন্তু পাসওয়ার্ড হাইড থাকবে
+        model = ERPUser
         fields = '__all__'
         extra_kwargs = {
             'password': {'write_only': True},
@@ -63,40 +60,78 @@ class ERPUserSerializer(serializers.ModelSerializer):
 # =====================================================
 
 class ERPUserCreateSerializer(serializers.ModelSerializer):
-    # পাসওয়ার্ড এবং অন্যান্য ফিল্ড ডিফাইন করা
-    password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+    password = serializers.CharField(write_only=True,required=True,style={'input_type': 'password'})
     is_active = serializers.BooleanField(default=True, required=False)
-    roles = serializers.ListField(
-        child=serializers.CharField(),
-        required=False,
-        default=list
-    )
+    roles = serializers.ListField(child=serializers.CharField(),required=False,default=list)
+    # Dynamic Properties (Read Only)
+    is_employee = serializers.ReadOnlyField()
+    is_customer = serializers.ReadOnlyField()
+    is_investor = serializers.ReadOnlyField()
+    is_marketing = serializers.ReadOnlyField()
 
     class Meta:
-        model = User # এখানে User = get_user_model() নিশ্চিত করুন
-        # __all__ ব্যবহার না করে নির্দিষ্ট ফিল্ডগুলো লিখে দিন
+        model = ERPUser
+
         fields = [
-            'id', 'username', 'email', 'password', 'full_name', 'phone',
-            'address', 'nid', 'date_of_birth', 'image', 'roles',
-            'department', 'employee_id', 'is_active'
+            'id',
+            'username',
+            'email',
+            'password',
+            'full_name',
+            'phone',
+            'address',
+            'nid',
+            'date_of_birth',
+            'is_active',
+            'image',
+            'roles',
+            'department',
+            'is_active',
+            'is_staff',
+            'is_employee',
+            'is_customer',
+            'is_investor',
+            'is_marketing',
+            'last_login',
+            'created_at',
+            'updated_at',
+            'referred_by',
+        ]
+
+        read_only_fields = [
+            'id',
+            'last_login',
+            'created_at',
+            'updated_at',
+            'is_employee',
+            'is_customer',
+            'is_investor',
+            'is_marketing',
         ]
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
-        # ইউজার অবজেক্ট তৈরি
-        user = User(**validated_data)
+
+        user = ERPUser(**validated_data)
+
         if password:
-            user.set_password(password) # পাসওয়ার্ড হ্যাশ করার জন্য এটি বাধ্যতামূলক
+            user.set_password(password)
+
         user.save()
+
         return user
 
     def update(self, instance, validated_data):
         password = validated_data.pop('password', None)
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+
         if password:
             instance.set_password(password)
+
         instance.save()
+
         return instance
 
 

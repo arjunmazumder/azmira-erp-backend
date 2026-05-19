@@ -46,17 +46,7 @@ def generate_commission(booking, amount, source_type):
 
 
 def get_upline_chain(marketing_officer, max_levels=7):
-    """
-    একজন officer এর upline chain বের করে।
     
-    উদাহরণ:
-        A → B → C → D (A direct, B=Gen2, C=Gen3, D=Gen4)
-    
-    Return: [(officer, generation), ...]
-        generation 0 = Direct (Shaki)
-        generation 1 = 1st
-        generation 2 = 2nd ... এভাবে
-    """
     chain = []
 
     # Gen 0 = Direct Officer নিজেই (Shaki/Direct)
