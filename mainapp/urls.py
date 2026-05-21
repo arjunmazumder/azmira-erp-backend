@@ -1,11 +1,12 @@
 from django.urls import path,include
 
-from .views import (
-    CommissionRuleListCreateView,
-    CommissionRuleDetailView,
-    CommissionListView,
-    CommissionDetailView,
-    GenerateCommissionView
+from accesscontrol.permission_api import (
+    ERPPermissionListView,
+    ERPRolePermissionListView,
+    ERPRolePermissionUpdateView,
+    ERPRolePermissionCreateView,
+    ERPRolePermissionDeleteView,
+    role_permission_summary,
 )
 
 from mainapp.views import (
@@ -95,6 +96,7 @@ from mainapp.views import (
     officer_commission_detail,
     commission_dashboard,
 
+
     # 15. Loan
     ERPLoanListView,
     ERPLoanDetailView,
@@ -169,6 +171,13 @@ from mainapp.views import (
     # Dashboard
     erp_dashboard_summary,
 
+    CommissionListView,
+    CommissionDetailView,
+    CommissionCreateView,
+    CommissionUpdateView,
+    CommissionDeleteView,
+    TransactionViewSet,
+
 )
 
 # =====================================================
@@ -178,7 +187,9 @@ from mainapp.views import (
 from rest_framework.routers import DefaultRouter
 router = DefaultRouter()
 router.register(r'land-power', LandPowerViewSet)
+router.register(r'transactions', TransactionViewSet, basename='transaction')
 urlpatterns = [
+    path('', include(router.urls)),
     path('', include(router.urls)),
 
     # =====================================================
@@ -310,14 +321,24 @@ urlpatterns = [
     # path('erp-commissions/new/', ERPCommissionCreateView.as_view(), name='erp-commission-create'),
 
 
-    # Commission Rules
-    path('commission-rules/', CommissionRuleListCreateView.as_view()),
-    path('commission-rules/<int:pk>/', CommissionRuleDetailView.as_view()),
-    # Commissions
-    path('commissions/', CommissionListView.as_view()),
-    path('commissions/<int:pk>/', CommissionDetailView.as_view()),
-    # Trigger Commission
-    path('generate-commission/', GenerateCommissionView.as_view()),
+    # # Commission Rules
+    # path('commission-rules/', CommissionRuleListCreateView.as_view()),
+    # path('commission-rules/<int:pk>/', CommissionRuleDetailView.as_view()),
+    # # Commissions
+    # path('commissions/', CommissionListView.as_view()),
+    # path('commissions/<int:pk>/', CommissionDetailView.as_view()),
+    # # Trigger Commission
+    # path('generate-commission/', GenerateCommissionView.as_view()),
+
+    path('commissions/',CommissionListView.as_view(),name='commission-list'),
+
+    path('commissions/<int:pk>/',CommissionDetailView.as_view(),name='commission-detail'),
+
+    path('commissions/create/',CommissionCreateView.as_view(),name='commission-create'),
+
+    path('commissions/update/<int:pk>/',CommissionUpdateView.as_view(),name='commission-update'),
+
+    path('commissions/delete/<int:pk>/',CommissionDeleteView.as_view(),name='commission-delete'),
 
     #from claude 
     path('commission-dashboard/', commission_dashboard, name='commission-dashboard'),
@@ -440,4 +461,13 @@ urlpatterns = [
     # DASHBOARD SUMMARY
     # =====================================================
     path('erp-dashboard/', erp_dashboard_summary, name='erp-dashboard'),
+]
+
+urlpatterns += [
+    path('permissions/',                      ERPPermissionListView.as_view(),       name='permission-list'),
+    path('role-permissions/',                 ERPRolePermissionListView.as_view(),   name='role-permission-list'),
+    path('role-permissions/create/',          ERPRolePermissionCreateView.as_view(), name='role-permission-create'),
+    path('role-permissions/<int:pk>/',        ERPRolePermissionUpdateView.as_view(), name='role-permission-update'),
+    path('role-permissions/<int:pk>/delete/', ERPRolePermissionDeleteView.as_view(), name='role-permission-delete'),
+    path('role-permission-summary/',          role_permission_summary,               name='role-permission-summary'),
 ]

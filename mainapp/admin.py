@@ -1,8 +1,8 @@
 from django.contrib import admin
 from mainapp.models import (
     ERPUser,
-    ERPProject,
-    ERPPlot,
+    Project,
+    Property,
     ERPLandRecord,
     ERPCustomer,
     ERPLead,
@@ -130,7 +130,7 @@ class ERPUserAdmin(admin.ModelAdmin):
 # 2. PROJECT
 # =====================================================
 
-@admin.register(ERPProject)
+@admin.register(Project)
 class ERPProjectAdmin(admin.ModelAdmin):
     list_display = ('id', 'project_code', 'project_name', 'project_type', 'status', 'total_plots', 'available_plots', 'created_at')
     list_filter = ('project_type', 'status', 'district')
@@ -168,10 +168,10 @@ class ERPProjectAdmin(admin.ModelAdmin):
 # =====================================================
 
 from django.contrib import admin
-from .models import ERPPlot
+from .models import Property
 
 
-@admin.register(ERPPlot)
+@admin.register(Property)
 class ERPPlotAdmin(admin.ModelAdmin):
 
     list_display = (

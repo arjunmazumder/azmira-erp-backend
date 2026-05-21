@@ -1,6 +1,6 @@
 import django_filters
-from mainapp.models import ERPPlot
-from mainapp.models import ERPProject
+from mainapp.models import Property
+from mainapp.models import Project
 from mainapp.models import ERPLandAcquisition
 
 
@@ -15,7 +15,7 @@ class ERPPlotFilter(django_filters.FilterSet):
     max_area = django_filters.NumberFilter(field_name="area", lookup_expr='lte')
 
     class Meta:
-        model = ERPPlot
+        model = Property
         fields = [
             'project',
             'status',
@@ -69,7 +69,7 @@ class ERPProjectFilter(django_filters.FilterSet):
     )
 
     class Meta:
-        model = ERPProject
+        model = Project
         fields = [
             'project_name',
             'project_type',

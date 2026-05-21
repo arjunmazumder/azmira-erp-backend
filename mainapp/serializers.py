@@ -2,13 +2,13 @@ from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
 
 from mainapp.models import (
-    ERPUser, ERPProject, ERPPlot, ERPLandRecord, ERPCustomer, ERPLead,
+    ERPUser, Project, Property, ERPLandRecord, ERPCustomer, ERPLead,
     ERPBooking, ERPInstallmentPlan, ERPMoneyReceipt, ERPVoucher,
     ERPProjectVisit, ERPMarketingOfficer, ERPWallet, ERPWalletTransaction,
     ERPCommissionRule, ERPCommission, ERPLoan, ERPInvestor, ERPInvestment,
     ERPDividend, ERPEmployee, ERPAttendance, ERPPayroll, ERPOfficerRequest,
     ERPAccountHead, ERPOffer, ERPSMSLog, ERPDocument, ERPCompanyAsset, ERPSystemLog,
-    LandPowerAssignment
+    LandPowerAssignment,Transaction
 )
 
 
@@ -142,7 +142,7 @@ class ERPProjectSerializer(serializers.ModelSerializer):
     status_display = serializers.SerializerMethodField()
 
     class Meta:
-        model = ERPProject
+        model = Project
         fields = '__all__'
 
     def get_project_type_display(self, obj): return obj.get_project_type_display()
@@ -157,7 +157,7 @@ class ERPPlotSerializer(serializers.ModelSerializer):
     status_display = serializers.SerializerMethodField()
 
     class Meta:
-        model = ERPPlot
+        model = Property
         fields = '__all__'
 
     def get_status_display(self, obj): return obj.get_status_display()
@@ -167,7 +167,7 @@ class ERPPlotSerializer(serializers.ModelSerializer):
 class FeaturedPlotSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = ERPPlot
+        model = Property
         fields = '__all__'
 
 
@@ -213,6 +213,101 @@ class ERPLeadSerializer(serializers.ModelSerializer):
 
     def get_status_display(self, obj): return obj.get_status_display()
 
+
+
+#======================================================
+# TRANACTIONS TABLE
+#=====================================================
+
+
+class TransactionSerializer(serializers.ModelSerializer):
+    transaction_type_display = serializers.CharField(
+        source='get_transaction_type_display', 
+        read_only=True
+    )
+    
+    customer_name = serializers.CharField(source='customer.full_name', read_only=True)
+    project_name = serializers.CharField(source='project.name', read_only=True)
+
+    class Meta:
+        model = Transaction
+        fields = [
+            'id', 'transaction_type', 'transaction_type_display', 
+            'customer', 'customer_name', 'project', 'project_name', 
+            'plot', 'referred_by', 'amount', 'transferred_to', 
+            'notes', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate(self, data):
+        
+        transaction_type = data.get('transaction_type')
+        transferred_to = data.get('transferred_to')
+
+        if transaction_type == 'transferred' and not transferred_to:
+            raise serializers.ValidationError({
+                "transferred_to": "ট্রানজেকশন টাইপ 'Transferred' হলে কাকে ট্রান্সফার করা হচ্ছে (transferred_to) তা জানাতে হবে।"
+            })
+            
+        if transferred_to and data.get('customer') == transferred_to:
+            raise serializers.ValidationError({
+                "transferred_to": "একই কাস্টমারকে নিজের অ্যাকাউন্টে ট্রান্সফার করা যাবে না।"
+            })
+
+        return data
+    
+#=================================================
+# Commission serialiazer
+#=============================================
+
+# serializers.py
+
+from rest_framework import serializers
+from mainapp.models import Commission
+
+
+class CommissionSerializer(serializers.ModelSerializer):
+
+    user_name = serializers.CharField(
+        source='user.full_name',
+        read_only=True
+    )
+
+    project_name = serializers.CharField(
+        source='project.name',
+        read_only=True
+    )
+
+    plot_name = serializers.CharField(
+        source='plot.name',
+        read_only=True
+    )
+
+    class Meta:
+        model = Commission
+
+        fields = [
+            'id',
+
+            'user',
+            'user_name',
+
+            'project',
+            'project_name',
+
+            'plot',
+            'plot_name',
+
+            'level',
+            'percent',
+            'commission',
+            'commission_type',
+            'note',
+
+            'created_at',
+            'paid_at',
+        ]
+        
 
 # ===== 7. BOOKING =====
 
@@ -757,3 +852,45 @@ class ERPLandAcquisitionSerializer(serializers.ModelSerializer):
 
     def get_land_status_display(self, obj):
         return obj.get_land_status_display()
+    
+
+# =====================================================
+# 27. PERMISSION SERIALIZERS
+# =====================================================
+
+from mainapp.models import ERPPermission, ERPRolePermission
+
+
+class ERPPermissionSerializer(serializers.ModelSerializer):
+    module_display = serializers.SerializerMethodField()
+    action_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = ERPPermission
+        fields = [
+            'id', 'codename', 'module', 'module_display',
+            'action', 'action_display', 'description', 'created_at'
+        ]
+
+    def get_module_display(self, obj): return obj.get_module_display()
+    def get_action_display(self, obj): return obj.get_action_display()
+
+
+class ERPRolePermissionSerializer(serializers.ModelSerializer):
+    permission_codename = serializers.ReadOnlyField(source='permission.codename')
+    permission_module   = serializers.ReadOnlyField(source='permission.module')
+    permission_action   = serializers.ReadOnlyField(source='permission.action')
+    scope_display       = serializers.SerializerMethodField()
+    role_display        = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = ERPRolePermission
+        fields = [
+            'id', 'role', 'role_display', 'permission',
+            'permission_codename', 'permission_module', 'permission_action',
+            'scope', 'scope_display', 'is_active',
+            'updated_by', 'created_at', 'updated_at',
+        ]
+
+    def get_scope_display(self, obj): return obj.get_scope_display()
+    def get_role_display(self, obj):  return obj.get_role_display()

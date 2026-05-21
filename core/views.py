@@ -27,7 +27,7 @@ from core.models import (
     
 )
 from mainapp.models import(
-    ERPProject, ERPPlot,
+    Project, Property,
 )
 
 from core.serializers import(
@@ -77,9 +77,9 @@ class ERPProjectByTypeView(APIView):
         ERPProject_type = request.query_params.get('ERPProject_type')
 
         if ERPProject_type:
-            ERPProjects = ERPProject.objects.filter(ERPProject_type=ERPProject_type)
+            ERPProjects = Project.objects.filter(ERPProject_type=ERPProject_type)
         else:
-            ERPProjects = ERPProject.objects.all()
+            ERPProjects = Project.objects.all()
 
         serializer = ERPProjectSerializer(ERPProjects, many=True)
         return success_response("ERPProjects fetched", serializer.data)
@@ -93,9 +93,9 @@ class ERPProjectSearchByNameView(APIView):
 
         # নামের আংশিক মিল চেক
         if ERPProject_name:
-            ERPProjects = ERPProject.objects.filter(name__icontains=ERPProject_name).order_by('-created_at')
+            ERPProjects = Project.objects.filter(name__icontains=ERPProject_name).order_by('-created_at')
         else:
-            ERPProjects = ERPProject.objects.all().order_by('-created_at')
+            ERPProjects = Project.objects.all().order_by('-created_at')
 
         if ERPProjects.exists():
             serializer = ERPProjectSerializer(ERPProjects, many=True)
@@ -108,7 +108,7 @@ class ERPProjectByLocationView(APIView):
         location_param = request.query_params.get('location', '')
         location_text = location_param.replace('-', ' ')
 
-        ERPProjects = ERPProject.objects.filter(location__icontains=location_text)
+        ERPProjects = Project.objects.filter(location__icontains=location_text)
         total_count = ERPProjects.count()
 
         serializer = ERPProjectSerializer(ERPProjects, many=True)
@@ -124,7 +124,7 @@ class ERPProjectByLocationView(APIView):
    
 class FeaturedERPPlotListView(APIView):
     def get(self, request):
-        featured_properties = ERPPlot.objects.filter(is_featured=True).order_by('-created_at')
+        featured_properties = Property.objects.filter(is_featured=True).order_by('-created_at')
         serializer = FeaturedERPPlotSerializer(featured_properties, many=True)
         return success_response("Featured properties retrieved successfully", serializer.data)
     
@@ -212,13 +212,13 @@ class MessageListAdminView(APIView):
 
 
 
-#-----------------ERPProject searching----------------
+#-----------------Project searching----------------
 
 class ERPProjectViewSet(viewsets.ModelViewSet):
     # permission_classes = [IsAuthenticated]
 
     # ✅ Correct related_name = 'plots'
-    queryset = ERPProject.objects.all().prefetch_related('plots').order_by('-created_at')
+    queryset = Project.objects.all().prefetch_related('plots').order_by('-created_at')
 
     serializer_class = ERPProjectSerializer
 
@@ -263,7 +263,7 @@ class ERPProjectViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
-        return success_response("ERPProject details retrieved successfully", serializer.data)
+        return success_response("Project details retrieved successfully", serializer.data)
 
 
     # 🔹 Create
@@ -272,11 +272,11 @@ class ERPProjectViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             serializer.save()
             return success_response(
-                "ERPProject created successfully",
+                "Project created successfully",
                 serializer.data,
                 status_code=status.HTTP_201_CREATED
             )
-        return error_response("ERPProject creation failed", serializer.errors)
+        return error_response("Project creation failed", serializer.errors)
 
 
     # 🔹 Update
@@ -287,9 +287,9 @@ class ERPProjectViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         if serializer.is_valid():
             serializer.save()
-            return success_response("ERPProject updated successfully", serializer.data)
+            return success_response("Project updated successfully", serializer.data)
 
-        return error_response("ERPProject update failed", serializer.errors)
+        return error_response("Project update failed", serializer.errors)
 
 
     # 🔹 Partial Update
@@ -303,16 +303,16 @@ class ERPProjectViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         instance.delete()
         return success_response(
-            "ERPProject deleted successfully",
+            "Project deleted successfully",
             None,
             status_code=status.HTTP_204_NO_CONTENT
         )   
 
-#-----------------ERPPlot searching-----------------------
+#-----------------Property searching-----------------------
 class ERPPlotViewSet(viewsets.ModelViewSet):
     # permission_classes = [IsAuthenticated]
 
-    queryset = ERPPlot.objects.all().select_related('project').order_by('-created_at')
+    queryset = Property.objects.all().select_related('project').order_by('-created_at')
     serializer_class = ERPPlotSerializer
 
     # ✅ Filter + Search + Ordering

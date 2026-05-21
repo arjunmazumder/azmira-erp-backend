@@ -18,8 +18,8 @@ from rest_framework.generics import ListAPIView
 
 from mainapp.models import (
     ERPUser,
-    ERPProject,
-    ERPPlot,
+    Project,
+    Property,
     ERPLandRecord,
     ERPCustomer,
     ERPLead,
@@ -50,7 +50,8 @@ from mainapp.models import (
     LandPowerAssignment,
     ERPSupplier, 
     ERPLandOwner, 
-    ERPLandAcquisition
+    ERPLandAcquisition,
+    Transaction,
 )
 
 from mainapp.serializers import (
@@ -91,6 +92,7 @@ from mainapp.serializers import (
     ERPSupplierSerializer,
     ERPLandOwnerSerializer,
     ERPLandAcquisitionSerializer,
+    TransactionSerializer,
 )
 
 from rest_framework import generics, status
@@ -103,8 +105,15 @@ from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny,IsAuthenticated
 from rest_framework import status
+from mainapp.api_permissions import(
+    IsSuperAdmin,
+    IsAdmin,
+    IsMarketingUser,
+    IsAccountsOfficer,
+
+)
 
 # =====================================================
 # 1. USER & AUTH VIEWS
@@ -141,35 +150,105 @@ class ERPUserCreateView(generics.CreateAPIView):
     permission_classes = [AllowAny]
 
 
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework import status
+from django.contrib.auth import authenticate
+from rest_framework_simplejwt.tokens import RefreshToken
+
+# আপনার পারমিশন ফাইল থেকে ক্যাশ হেল্পারটি ইমপোর্ট করুন
+from accesscontrol.permissions import get_role_permissions 
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def erp_user_login(request):
     username = request.data.get('username')
     password = request.data.get('password')
 
-    # ১. ইউজার অথেন্টিকেট করা (এটি হ্যাশ করা পাসওয়ার্ড অটোমেটিক চেক করবে)
+    # ১. ইউজারনেম এবং পাসওয়ার্ড চেক করা
+    if not username or not password:
+        return Response({'error': 'Username and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # ২. ইউজার অথেন্টিকেশন
     user = authenticate(username=username, password=password)
 
     if user is not None:
         if user.is_active:
-            # ২. টোকেন তৈরি করা
+            # ৩. JWT টোকেন তৈরি
             refresh = RefreshToken.for_user(user)
-            return Response({
+            
+            # ৪. ইউজারের রোলস লিস্ট নেওয়া
+            user_roles = list(user.roles or [])
+            access_control = {}
+
+            # 👑 ৫. অ্যাডমিন বা সুপার অ্যাডমিন হলে সরাসরি ফুল পারমিশন বাইপাস করা
+            if 'admin' in user_roles or 'super_admin' in user_roles:
+                # আপনার ERPPermission মডেলে থাকা সব মডিউলের লিস্ট
+                all_modules = [
+                    'project', 'plot', 'booking', 'installment', 'receipt', 
+                    'commission', 'wallet', 'lead', 'attendance', 'payroll', 
+                    'investment', 'dividend', 'officer_request', 'document', 'offer'
+                ]
+                for module in all_modules:
+                    access_control[module] = {
+                        "view": True,
+                        "create": True,
+                        "edit": True,
+                        "delete": True,
+                        "scope": "all"  # অ্যাডমিন সব ডেটা দেখবে (All Data)
+                    }
+            
+            # 👥 ৬. সাধারণ ইউজার হলে ক্যাশ/ডাটাবেজ থেকে পারমিশন প্রসেস করা
+            else:
+                # সার্কুলার ইমপোর্ট এরর ঠেকাতে ফাংশনের ভেতরে লোকাল ইমপোর্ট
+                # from api.permissions import get_role_permissions 
+                
+                for role in user_roles:
+                    role_perms = get_role_permissions(role)  # ক্যাশ হেল্পার থেকে আসে
+                    
+                    for codename, scope in role_perms.items():
+                        # 'booking.view' -> module='booking', action='view'
+                        if '.' in codename:
+                            module, action = codename.split('.', 1)
+                        else:
+                            continue
+                        
+                        # মডিউল অবজেক্ট ইনিশিয়াল করা
+                        if module not in access_control:
+                            access_control[module] = {
+                                "view": False, "create": False, "edit": False, "delete": False, "scope": "own"
+                            }
+                        
+                        # অ্যাকশন ট্রু করা
+                        if action in access_control[module]:
+                            access_control[module][action] = True
+                        
+                        # স্কোপ মার্জ করা ('all' প্রায়োরিটি পাবে)
+                        if scope == 'all':
+                            access_control[module]["scope"] = 'all'
+                        elif scope == 'own' and access_control[module]["scope"] != 'all':
+                            access_control[module]["scope"] = 'own'
+
+            # ৭. রেসপন্স ডাটা রিটার্ন করা
+            response_data = {
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
                 'user': {
                     'id': user.id,
                     'username': user.username,
                     'full_name': user.full_name,
-                    'roles': user.roles
+                    'roles': user_roles,
+                    'access_control': access_control
                 }
-            }, status=status.HTTP_200_OK)
+            }
+            return Response(response_data, status=status.HTTP_200_OK)
         else:
             return Response({'error': 'Account is disabled'}, status=status.HTTP_403_FORBIDDEN)
     else:
-        # ভুল ইউজারনেম বা পাসওয়ার্ড হলে
         return Response({'error': 'Invalid username or password'}, status=status.HTTP_401_UNAUTHORIZED)
-    
 
 
 class ERPUserByRoleView(generics.ListAPIView):
@@ -179,14 +258,25 @@ class ERPUserByRoleView(generics.ListAPIView):
     def get_queryset(self):
         return ERPUser.objects.filter(roles__contains=[self.kwargs['role']], is_active=True)
 
-
 # =====================================================
 # 2. PROJECT VIEWS
 # =====================================================
 
+
 class ERPProjectListView(generics.ListAPIView):
-    permission_classes = [AllowAny]
-    queryset = ERPProject.objects.all()
+  
+    def get_permissions(self):
+        """Action-এর বদলে request.method দিয়ে পারমিশন চেক করা হচ্ছে"""
+        # GET রিকোয়েস্ট ছাড়া বাকি সব (POST, PUT, PATCH, DELETE) এর জন্য IsAdmin চেক হবে
+        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            self.permission_classes = [IsAdmin] # অথবা IsAdminOrSuperAdmin
+        else:
+            self.permission_classes = [IsAuthenticated] # GET রিকোয়েস্টের জন্য শুধু লগইন থাকলেই হবে
+            
+        return super().get_permissions()
+    
+      
+    queryset = Project.objects.all()
     serializer_class = ERPProjectSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = ERPProjectFilter
@@ -213,15 +303,31 @@ class ERPProjectListView(generics.ListAPIView):
 
 
 class ERPProjectDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [AllowAny]
-    queryset = ERPProject.objects.all()
+    def get_permissions(self):
+        """Action-এর বদলে request.method দিয়ে পারমিশন চেক করা হচ্ছে"""
+        # GET রিকোয়েস্ট ছাড়া বাকি সব (POST, PUT, PATCH, DELETE) এর জন্য IsAdmin চেক হবে
+        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            self.permission_classes = [IsAdmin] # অথবা IsAdminOrSuperAdmin
+        else:
+            self.permission_classes = [IsAuthenticated] # GET রিকোয়েস্টের জন্য শুধু লগইন থাকলেই হবে
+            
+        return super().get_permissions()
+    queryset = Project.objects.all()
     serializer_class = ERPProjectSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
 
 class ERPProjectCreateView(generics.CreateAPIView):
-    permission_classes = [AllowAny]
-    queryset = ERPProject.objects.all()
+    def get_permissions(self):
+        """Action-এর বদলে request.method দিয়ে পারমিশন চেক করা হচ্ছে"""
+        # GET রিকোয়েস্ট ছাড়া বাকি সব (POST, PUT, PATCH, DELETE) এর জন্য IsAdmin চেক হবে
+        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            self.permission_classes = [IsAdmin] # অথবা IsAdminOrSuperAdmin
+        else:
+            self.permission_classes = [IsAuthenticated] # GET রিকোয়েস্টের জন্য শুধু লগইন থাকলেই হবে
+            
+        return super().get_permissions()
+    queryset = Project.objects.all()
     serializer_class = ERPProjectSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
@@ -231,21 +337,16 @@ class ERPProjectCreateView(generics.CreateAPIView):
 # =====================================================
 
 class ERPPlotListView(generics.ListAPIView):
-    """
-    GET /api/erp-plots/
- 
-    Filter params:
-        project, status, plot_type, facing,
-        bedrooms, bathrooms, floor_number,
-        min_price, max_price, min_area, max_area
- 
-    Search params:
-        ?search=<keyword>
- 
-    Ordering params:
-        ?ordering=final_price / -final_price / area / created_at
-    """
-    permission_classes = [AllowAny]
+    def get_permissions(self):
+            """Action-এর বদলে request.method দিয়ে পারমিশন চেক করা হচ্ছে"""
+            # GET রিকোয়েস্ট ছাড়া বাকি সব (POST, PUT, PATCH, DELETE) এর জন্য IsAdmin চেক হবে
+            if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+                self.permission_classes = [IsAdmin] # অথবা IsAdminOrSuperAdmin
+            else:
+                self.permission_classes = [IsAuthenticated] # GET রিকোয়েস্টের জন্য শুধু লগইন থাকলেই হবে
+                
+            return super().get_permissions()
+   
     serializer_class = ERPPlotSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = ERPPlotFilter
@@ -275,25 +376,50 @@ class ERPPlotListView(generics.ListAPIView):
     ordering = ['plot_number']  # default ordering
  
     def get_queryset(self):
-        return ERPPlot.objects.select_related('project').all()
+        return Property.objects.select_related('project').all()
 
 
 class ERPPlotDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [AllowAny]
-    queryset = ERPPlot.objects.all()
+    def get_permissions(self):
+        """Action-এর বদলে request.method দিয়ে পারমিশন চেক করা হচ্ছে"""
+        # GET রিকোয়েস্ট ছাড়া বাকি সব (POST, PUT, PATCH, DELETE) এর জন্য IsAdmin চেক হবে
+        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            self.permission_classes = [IsAdmin] # অথবা IsAdminOrSuperAdmin
+        else:
+            self.permission_classes = [IsAuthenticated] # GET রিকোয়েস্টের জন্য শুধু লগইন থাকলেই হবে
+            
+        return super().get_permissions()
+    queryset = Property.objects.all()
     serializer_class = ERPPlotSerializer
 
 
 class ERPPlotCreateView(generics.CreateAPIView):
-    permission_classes = [AllowAny]
-    queryset = ERPPlot.objects.all()
+    def get_permissions(self):
+        """Action-এর বদলে request.method দিয়ে পারমিশন চেক করা হচ্ছে"""
+        # GET রিকোয়েস্ট ছাড়া বাকি সব (POST, PUT, PATCH, DELETE) এর জন্য IsAdmin চেক হবে
+        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            self.permission_classes = [IsAdmin] # অথবা IsAdminOrSuperAdmin
+        else:
+            self.permission_classes = [IsAuthenticated] # GET রিকোয়েস্টের জন্য শুধু লগইন থাকলেই হবে
+            
+        return super().get_permissions()
+    queryset = Property.objects.all()
     serializer_class = ERPPlotSerializer
 
 class FeaturedPlotListAPIView(ListAPIView):
+    def get_permissions(self):
+        """Action-এর বদলে request.method দিয়ে পারমিশন চেক করা হচ্ছে"""
+        # GET রিকোয়েস্ট ছাড়া বাকি সব (POST, PUT, PATCH, DELETE) এর জন্য IsAdmin চেক হবে
+        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            self.permission_classes = [IsAdmin] # অথবা IsAdminOrSuperAdmin
+        else:
+            self.permission_classes = [IsAuthenticated] # GET রিকোয়েস্টের জন্য শুধু লগইন থাকলেই হবে
+            
+        return super().get_permissions()
+    
     serializer_class = FeaturedPlotSerializer
-
     def get_queryset(self):
-        return ERPPlot.objects.filter(
+        return Property.objects.filter(
             is_featured=True
         ).order_by('-id')
     
@@ -322,7 +448,6 @@ class ERPLandRecordDetailView(generics.RetrieveUpdateDestroyAPIView):
 class ERPLandRecordCreateView(generics.CreateAPIView):
     queryset = ERPLandRecord.objects.all()
     serializer_class = ERPLandRecordSerializer
-
 
 # =====================================================
 # 5. CUSTOMER VIEWS
@@ -376,6 +501,92 @@ class ERPLeadCreateView(generics.CreateAPIView):
     queryset = ERPLead.objects.all()
     serializer_class = ERPLeadSerializer
 
+
+
+
+#======================================================
+# TRANACTIONS TABLE
+#=====================================================
+
+
+class TransactionViewSet(viewsets.ModelViewSet):
+    queryset = Transaction.objects.all()
+    serializer_class = TransactionSerializer
+    
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    
+    filterset_fields = ['transaction_type', 'customer', 'project', 'plot']
+    
+    search_fields = ['notes', 'customer__full_name']
+    
+    ordering_fields = ['created_at', 'amount']
+
+    def perform_create(self, serializer):
+        if not self.request.data.get('referred_by'):
+            serializer.save(referred_by=self.request.user)
+        else:
+            serializer.save()
+
+
+#==============================================================
+# Commission
+#============================================================
+
+# views.py
+
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
+
+from mainapp.models import Commission
+from mainapp.serializers import CommissionSerializer
+
+
+# =====================================================
+# COMMISSION LIST
+# =====================================================
+
+class CommissionListView(generics.ListAPIView):
+
+    queryset = Commission.objects.all()
+
+    serializer_class = CommissionSerializer
+
+    # permission_classes = [IsAuthenticated]
+
+
+class CommissionDetailView(generics.RetrieveAPIView):
+
+    queryset = Commission.objects.all()
+
+    serializer_class = CommissionSerializer
+
+    # permission_classes = [IsAuthenticated]
+
+
+class CommissionCreateView(generics.CreateAPIView):
+
+    queryset = Commission.objects.all()
+
+    serializer_class = CommissionSerializer
+
+    # permission_classes = [IsAuthenticated]
+
+
+class CommissionUpdateView(generics.UpdateAPIView):
+
+    queryset = Commission.objects.all()
+
+    serializer_class = CommissionSerializer
+
+    # permission_classes = [IsAuthenticated]
+
+class CommissionDeleteView(generics.DestroyAPIView):
+
+    queryset = Commission.objects.all()
+
+    serializer_class = CommissionSerializer
+
+    # permission_classes = [IsAuthenticated]
 
 # =====================================================
 # 7. BOOKING VIEWS
@@ -987,36 +1198,36 @@ class ERPWalletTransactionCreateView(generics.CreateAPIView):
 # 14. COMMISSION VIEWS
 # =====================================================
 
-class CommissionRuleListCreateView(generics.ListCreateAPIView):
-    queryset = ERPCommissionRule.objects.all()
-    serializer_class = ERPCommissionRuleSerializer
+# class CommissionRuleListCreateView(generics.ListCreateAPIView):
+#     queryset = ERPCommissionRule.objects.all()
+#     serializer_class = ERPCommissionRuleSerializer
 
 
-class CommissionRuleDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = ERPCommissionRule.objects.all()
-    serializer_class = ERPCommissionRuleSerializer
+# class CommissionRuleDetailView(generics.RetrieveUpdateDestroyAPIView):
+#     queryset = ERPCommissionRule.objects.all()
+#     serializer_class = ERPCommissionRuleSerializer
 
 
-class CommissionListView(generics.ListAPIView):
-    serializer_class = ERPCommissionSerializer
+# class CommissionListView(generics.ListAPIView):
+#     serializer_class = ERPCommissionSerializer
 
-    def get_queryset(self):
-        qs = ERPCommission.objects.all()
-        officer = self.request.query_params.get('officer')
-        comm_status = self.request.query_params.get('status')
-        booking = self.request.query_params.get('booking')
-        if officer:
-            qs = qs.filter(marketing_officer_id=officer)
-        if comm_status:
-            qs = qs.filter(status=comm_status)
-        if booking:
-            qs = qs.filter(booking_id=booking)
-        return qs
+#     def get_queryset(self):
+#         qs = ERPCommission.objects.all()
+#         officer = self.request.query_params.get('officer')
+#         comm_status = self.request.query_params.get('status')
+#         booking = self.request.query_params.get('booking')
+#         if officer:
+#             qs = qs.filter(marketing_officer_id=officer)
+#         if comm_status:
+#             qs = qs.filter(status=comm_status)
+#         if booking:
+#             qs = qs.filter(booking_id=booking)
+#         return qs
 
 
-class CommissionDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = ERPCommission.objects.all()
-    serializer_class = ERPCommissionSerializer
+# class CommissionDetailView(generics.RetrieveUpdateDestroyAPIView):
+#     queryset = ERPCommission.objects.all()
+#     serializer_class = ERPCommissionSerializer
 
 # =====================================================
 # ✅ FIXED: GenerateCommissionView
@@ -2050,10 +2261,10 @@ def erp_dashboard_summary(request):
 
     pending_receipts = ERPMoneyReceipt.objects.filter(status='pending').count()
 
-    total_plots     = ERPPlot.objects.count()
-    available_plots = ERPPlot.objects.filter(status='available').count()
-    booked_plots    = ERPPlot.objects.filter(status='booked').count()
-    sold_plots      = ERPPlot.objects.filter(status='sold').count()
+    total_plots     = Property.objects.count()
+    available_plots = Property.objects.filter(status='available').count()
+    booked_plots    = Property.objects.filter(status='booked').count()
+    sold_plots      = Property.objects.filter(status='sold').count()
 
     upcoming_due = ERPInstallmentPlan.objects.filter(
         is_paid=False,

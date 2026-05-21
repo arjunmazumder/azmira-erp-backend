@@ -6,8 +6,8 @@ from core.models import (
     Gallary
 )
 from mainapp.models import(
-    ERPProject,
-    ERPPlot
+    Project,
+    Property
     
 )
 
@@ -26,7 +26,7 @@ class GallarySerializer(serializers.ModelSerializer):
 # ১. লুপ এড়ানোর জন্য একটি বেসিক প্রজেক্ট সিরিয়ালাইজার
 class SimpleERPProjectSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ERPProject
+        model = Project
         fields = '__all__'   # ✅ correct
 
 
@@ -34,7 +34,7 @@ class SimpleERPProjectSerializer(serializers.ModelSerializer):
 class ERPPlotSerializer(serializers.ModelSerializer):
     # ✅ write করার জন্য project id
     project = serializers.PrimaryKeyRelatedField(
-        queryset=ERPProject.objects.all()
+        queryset=Project.objects.all()
     )
 
     # ✅ read করার জন্য nested project
@@ -43,7 +43,7 @@ class ERPPlotSerializer(serializers.ModelSerializer):
     image = serializers.ImageField(required=False)
 
     class Meta:
-        model = ERPPlot
+        model = Property
         fields = '__all__'
 
 # ৩. মেইন প্রজেক্ট সিরিয়ালাইজার
@@ -52,14 +52,14 @@ class ERPProjectSerializer(serializers.ModelSerializer):
     plots = ERPPlotSerializer(many=True, read_only=True)  # ✅ fixed
 
     class Meta:
-        model = ERPProject
+        model = Project
         fields = '__all__'  # ✅ fixed
 
 
 class FeaturedERPPlotSerializer(serializers.ModelSerializer):
-    ERPProject_name = serializers.ReadOnlyField(source='ERPProject.name')
+    ERPProject_name = serializers.ReadOnlyField(source='Project.name')
     class Meta:
-        model = ERPPlot
+        model = Property
         fields = '__all__'
 
 
