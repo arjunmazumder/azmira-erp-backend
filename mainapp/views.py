@@ -546,47 +546,105 @@ from mainapp.serializers import CommissionSerializer
 # =====================================================
 
 class CommissionListView(generics.ListAPIView):
-
-    queryset = Commission.objects.all()
-
+    """
+    GET /commissions/
+    ?user=5
+    ?project=1
+    ?commission_type=booking
+    ?paid=true / ?paid=false
+    """
     serializer_class = CommissionSerializer
 
-    # permission_classes = [IsAuthenticated]
+    def get_queryset(self):
+        qs = Commission.objects.select_related('user', 'project', 'plot').all()
+
+        user            = self.request.query_params.get('user')
+        project         = self.request.query_params.get('project')
+        commission_type = self.request.query_params.get('commission_type')
+        paid            = self.request.query_params.get('paid')
+
+        if user:
+            qs = qs.filter(user_id=user)
+        if project:
+            qs = qs.filter(project_id=project)
+        if commission_type:
+            qs = qs.filter(commission_type=commission_type)
+        if paid == 'true':
+            qs = qs.filter(paid_at__isnull=False)
+        elif paid == 'false':
+            qs = qs.filter(paid_at__isnull=True)
+
+        return qs
 
 
 class CommissionDetailView(generics.RetrieveAPIView):
-
-    queryset = Commission.objects.all()
-
+    """GET /commissions/<id>/"""
+    queryset         = Commission.objects.select_related('user', 'project', 'plot').all()
     serializer_class = CommissionSerializer
-
-    # permission_classes = [IsAuthenticated]
 
 
 class CommissionCreateView(generics.CreateAPIView):
-
-    queryset = Commission.objects.all()
-
+    """POST /commissions/create/"""
+    queryset         = Commission.objects.all()
     serializer_class = CommissionSerializer
-
-    # permission_classes = [IsAuthenticated]
 
 
 class CommissionUpdateView(generics.UpdateAPIView):
+    """PATCH /commissions/<id>/update/"""
+    queryset          = Commission.objects.all()
+    serializer_class  = CommissionSerializer
+    http_method_names = ['patch']
 
-    queryset = Commission.objects.all()
-
-    serializer_class = CommissionSerializer
-
-    # permission_classes = [IsAuthenticated]
 
 class CommissionDeleteView(generics.DestroyAPIView):
-
-    queryset = Commission.objects.all()
-
+    """DELETE /commissions/<id>/delete/"""
+    queryset         = Commission.objects.all()
     serializer_class = CommissionSerializer
 
-    # permission_classes = [IsAuthenticated]
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete()
+        return Response({'message': 'Commission deleted successfully.'})
+
+
+class CommissionMarkPaidView(generics.UpdateAPIView):
+    """
+    PATCH /commissions/<id>/mark-paid/
+    Commission paid mark করা
+    """
+    queryset          = Commission.objects.all()
+    serializer_class  = CommissionSerializer
+    http_method_names = ['patch']
+
+    def patch(self, request, *args, **kwargs):
+        from django.utils import timezone
+        instance         = self.get_object()
+        instance.paid_at = timezone.now()
+        instance.save()
+        return Response({
+            'message': 'Commission marked as paid.',
+            'paid_at': instance.paid_at,
+        })
+
+
+class CommissionSummaryView(generics.ListAPIView):
+    """
+    GET /commissions/summary/
+    প্রতিটি user এর total commission summary
+    """
+    def get(self, request):
+        from django.db.models import Sum, Count, Q
+
+        summary = Commission.objects.values(
+            'user__id', 'user__full_name'
+        ).annotate(
+            total_commission = Sum('commission'),
+            total_count      = Count('id'),
+            paid_count       = Count('id', filter=Q(paid_at__isnull=False)),
+            unpaid_count     = Count('id', filter=Q(paid_at__isnull=True)),
+        ).order_by('-total_commission')
+
+        return Response(summary)
 
 # =====================================================
 # 7. BOOKING VIEWS
@@ -1194,40 +1252,7 @@ class ERPWalletTransactionCreateView(generics.CreateAPIView):
         return Response(self.get_serializer(txn).data, status=status.HTTP_201_CREATED)
 
 
-# =====================================================
-# 14. COMMISSION VIEWS
-# =====================================================
 
-# class CommissionRuleListCreateView(generics.ListCreateAPIView):
-#     queryset = ERPCommissionRule.objects.all()
-#     serializer_class = ERPCommissionRuleSerializer
-
-
-# class CommissionRuleDetailView(generics.RetrieveUpdateDestroyAPIView):
-#     queryset = ERPCommissionRule.objects.all()
-#     serializer_class = ERPCommissionRuleSerializer
-
-
-# class CommissionListView(generics.ListAPIView):
-#     serializer_class = ERPCommissionSerializer
-
-#     def get_queryset(self):
-#         qs = ERPCommission.objects.all()
-#         officer = self.request.query_params.get('officer')
-#         comm_status = self.request.query_params.get('status')
-#         booking = self.request.query_params.get('booking')
-#         if officer:
-#             qs = qs.filter(marketing_officer_id=officer)
-#         if comm_status:
-#             qs = qs.filter(status=comm_status)
-#         if booking:
-#             qs = qs.filter(booking_id=booking)
-#         return qs
-
-
-# class CommissionDetailView(generics.RetrieveUpdateDestroyAPIView):
-#     queryset = ERPCommission.objects.all()
-#     serializer_class = ERPCommissionSerializer
 
 # =====================================================
 # ✅ FIXED: GenerateCommissionView
@@ -1409,32 +1434,34 @@ class GenerateCommissionView(APIView):
 # 14B. COMMISSION DASHBOARD
 # =====================================================
 
-
-
 @api_view(['GET'])
 def commission_dashboard(request):
-    """
-    GET /api/commission-dashboard/
-
-    স্ক্রিনশটের মতো Generation × Source-Type টেবিল।
-
-    Optional Query Params:
-        ?project=<id>
-        ?officer=<id>
-        ?date_from=YYYY-MM-DD
-        ?date_to=YYYY-MM-DD
-    """
     project_id = request.query_params.get('project')
     officer_id = request.query_params.get('officer')
     date_from  = request.query_params.get('date_from')
     date_to    = request.query_params.get('date_to')
 
-    qs = ERPCommission.objects.all()
+    qs = Commission.objects.all()  # ← ERPCommission → Commission
+
+    GENERATION_LABELS = {
+    0: 'Direct',
+    1: '1st', 2: '2nd', 3: '3rd',
+    4: '4th', 5: '5th', 6: '6th', 7: '7th',
+    }
+
+    # officer filter থাকলে level 0 এর label এ officer এর নাম দেখাও
+    if officer_id:
+        try:
+            officer = ERPUser.objects.get(id=officer_id)
+            GENERATION_LABELS[0] = f'Direct ({officer.full_name})'
+        except ERPUser.DoesNotExist:
+            pass
+    
 
     if project_id:
-        qs = qs.filter(booking__project_id=project_id)
+        qs = qs.filter(project_id=project_id)  # ← booking__project_id → project_id
     if officer_id:
-        qs = qs.filter(marketing_officer_id=officer_id)
+        qs = qs.filter(user_id=officer_id)     # ← marketing_officer_id → user_id
     if date_from:
         qs = qs.filter(created_at__date__gte=date_from)
     if date_to:
@@ -1445,23 +1472,13 @@ def commission_dashboard(request):
         'registration', 'land_dev', 'parking', 'transfer', 'utility',
     ]
 
-    GENERATION_LABELS = {
-        0: 'Direct (Shaki)',
-        1: '1st',
-        2: '2nd',
-        3: '3rd',
-        4: '4th',
-        5: '5th',
-        6: '6th',
-        7: '7th',
-    }
 
     # Overall Summary
     summary_agg = qs.aggregate(
-        total_commission=Sum('commission_amount'),
-        total_paid=Sum('commission_amount', filter=Q(status='paid')),
-        total_pending=Sum('commission_amount', filter=Q(status__in=['pending', 'approved'])),
-        total_officers=Count('marketing_officer', distinct=True),
+        total_commission = Sum('commission'),       # ← commission_amount → commission
+        total_paid       = Sum('commission', filter=Q(paid_at__isnull=False)),  # ← status='paid' → paid_at
+        total_pending    = Sum('commission', filter=Q(paid_at__isnull=True)),
+        total_officers   = Count('user', distinct=True),  # ← marketing_officer → user
     )
 
     # Generation-wise breakdown
@@ -1471,18 +1488,18 @@ def commission_dashboard(request):
 
     for gen in range(0, 8):
         row = {
-            'generation':       gen,
-            'generation_label': GENERATION_LABELS.get(gen, f'Gen {gen}'),
+        'level': gen,              
+        'generation_label': GENERATION_LABELS.get(gen, f'Level {gen}'),
         }
         row_total = Decimal('0.00')
 
         for source in SOURCE_TYPES:
             agg = qs.filter(
-                generation=gen,
-                source_type=source
+                level=gen,                   
+                commission_type=source      
             ).aggregate(
-                total_amount=Sum('commission_amount'),
-                total_rate=Sum('commission_rate'),
+                total_amount = Sum('commission'),   # ← commission_amount → commission
+                total_rate   = Sum('percent'),      # ← commission_rate → percent
             )
 
             amount = agg['total_amount'] or Decimal('0.00')
@@ -1518,37 +1535,40 @@ def commission_dashboard(request):
     })
 
 
+
 @api_view(['GET'])
 def officer_commission_detail(request, officer_id):
     """
-    GET /api/commission-dashboard/officer/<officer_id>/
+    GET /commission-dashboard/officer/<officer_id>/
     একজন নির্দিষ্ট officer এর commission detail।
     """
+    from mainapp.models import ERPWallet
+
     try:
-        officer = ERPMarketingOfficer.objects.select_related('user').get(id=officer_id)
-    except ERPMarketingOfficer.DoesNotExist:
+        officer = ERPUser.objects.get(id=officer_id)
+    except ERPUser.DoesNotExist:
         return Response({'error': 'Officer not found'}, status=404)
 
-    commissions = ERPCommission.objects.filter(marketing_officer=officer)
+    commissions = Commission.objects.filter(user=officer)
 
     gen_summary = {}
     for comm in commissions:
-        gen = comm.generation
+        gen = comm.level
         if gen not in gen_summary:
             gen_summary[gen] = {
-                'generation':       gen,
-                'label':            'Direct' if gen == 0 else f'Gen {gen}',
-                'count':            0,
-                'total_amount':     Decimal('0.00'),
-                'paid_amount':      Decimal('0.00'),
-                'pending_amount':   Decimal('0.00'),
+                'level':          gen,
+                'label':          'Direct' if gen == 0 else f'{gen}th',
+                'count':          0,
+                'total_amount':   Decimal('0.00'),
+                'paid_amount':    Decimal('0.00'),
+                'pending_amount': Decimal('0.00'),
             }
         gen_summary[gen]['count']        += 1
-        gen_summary[gen]['total_amount'] += comm.commission_amount
-        if comm.status == 'paid':
-            gen_summary[gen]['paid_amount']    += comm.commission_amount
+        gen_summary[gen]['total_amount'] += comm.commission
+        if comm.paid_at:
+            gen_summary[gen]['paid_amount']    += comm.commission
         else:
-            gen_summary[gen]['pending_amount'] += comm.commission_amount
+            gen_summary[gen]['pending_amount'] += comm.commission
 
     gen_list = []
     for gen, data in sorted(gen_summary.items()):
@@ -1560,22 +1580,21 @@ def officer_commission_detail(request, officer_id):
         })
 
     overall = commissions.aggregate(
-        total=Sum('commission_amount'),
-        paid=Sum('commission_amount', filter=Q(status='paid')),
+        total=Sum('commission'),
+        paid=Sum('commission', filter=Q(paid_at__isnull=False)),
     )
 
     wallet_balance = 0
     try:
-        wallet_balance = float(officer.user.wallet.balance)
+        wallet = ERPWallet.objects.get(user=officer)
+        wallet_balance = float(wallet.balance)
     except Exception:
         pass
 
     return Response({
         'officer': {
             'id':             officer.id,
-            'name':           officer.user.full_name,
-            'code':           officer.officer_code,
-            'rank':           officer.get_rank_display(),
+            'name':           officer.full_name,
             'wallet_balance': wallet_balance,
         },
         'commission_summary': {
@@ -1583,7 +1602,7 @@ def officer_commission_detail(request, officer_id):
             'paid':    float(overall['paid']   or 0),
             'pending': float((overall['total'] or 0) - (overall['paid'] or 0)),
         },
-        'by_generation': gen_list,
+        'by_level': gen_list,
     })
 
 

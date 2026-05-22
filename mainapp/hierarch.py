@@ -5,7 +5,9 @@ def up_line_id(user_id):
  
     try:
         user = ERPUser.objects.get(id=user_id)
-        return user.referred_by 
+        if user.referred_by is None:
+            return None
+        return user.referred_by_id  
     except ERPUser.DoesNotExist:
         return None
 

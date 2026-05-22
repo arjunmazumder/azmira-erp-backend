@@ -8,6 +8,7 @@ django-filter==25.2
 djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
 fonttools==4.62.1
+mysqlclient==2.2.8
 pillow==12.2.0
 pycparser==3.0
 pydyf==0.12.1

@@ -260,55 +260,27 @@ class TransactionSerializer(serializers.ModelSerializer):
 # Commission serialiazer
 #=============================================
 
-# serializers.py
-
-from rest_framework import serializers
 from mainapp.models import Commission
 
-
 class CommissionSerializer(serializers.ModelSerializer):
-
-    user_name = serializers.CharField(
-        source='user.full_name',
-        read_only=True
-    )
-
-    project_name = serializers.CharField(
-        source='project.name',
-        read_only=True
-    )
-
-    plot_name = serializers.CharField(
-        source='plot.name',
-        read_only=True
-    )
+    user_name    = serializers.ReadOnlyField(source='user.full_name')
+    project_name = serializers.ReadOnlyField(source='project.project_name')
+    plot_number  = serializers.ReadOnlyField(source='plot.plot_number')
 
     class Meta:
-        model = Commission
-
+        model  = Commission
         fields = [
-            'id',
-
-            'user',
-            'user_name',
-
-            'project',
-            'project_name',
-
-            'plot',
-            'plot_name',
-
-            'level',
-            'percent',
-            'commission',
-            'commission_type',
-            'note',
-
-            'created_at',
-            'paid_at',
+            'id', 'user', 'user_name',
+            'project', 'project_name',
+            'plot', 'plot_number',
+            'level', 'percent', 'commission',
+            'commission_type', 'note',
+            'created_at', 'paid_at',
         ]
-        
+        read_only_fields = ['id', 'created_at']
 
+
+        
 # ===== 7. BOOKING =====
 
 class ERPBookingSerializer(serializers.ModelSerializer):
@@ -511,31 +483,6 @@ class ERPWalletTransactionSerializer(serializers.ModelSerializer):
     def get_status_display(self, obj): return obj.get_status_display()
 
 
-# ===== 14. COMMISSION =====
-
-# class ERPCommissionRuleSerializer(serializers.ModelSerializer):
-#     project_name = serializers.ReadOnlyField(source='project.project_name')
-
-#     class Meta:
-#         model = ERPCommissionRule
-#         fields = '__all__'
-
-
-# class ERPCommissionSerializer(serializers.ModelSerializer):
-#     officer_name = serializers.SerializerMethodField()
-#     booking_code = serializers.ReadOnlyField(source='booking.booking_code')
-#     status_display = serializers.SerializerMethodField()
-
-#     class Meta:
-#         model = ERPCommission
-#         fields = '__all__'
-
-#     def get_officer_name(self, obj):
-#         return obj.marketing_officer.user.full_name if obj.marketing_officer else None
-
-#     def get_status_display(self, obj): return obj.get_status_display()
-
-
 
 class ERPCommissionRuleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -553,7 +500,6 @@ class ERPCommissionSerializer(serializers.ModelSerializer):
     def get_officer_name(self, obj):
         return obj.marketing_officer.user.full_name if obj.marketing_officer else None
     
-
 
 # ===== 15. LOAN =====
 
@@ -667,8 +613,6 @@ class ERPPayrollSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_payment_status_display(self, obj): return obj.get_payment_status_display()
-
-
 
 
 # ===== 18. OFFICER REQUEST =====
@@ -891,6 +835,19 @@ class ERPRolePermissionSerializer(serializers.ModelSerializer):
             'scope', 'scope_display', 'is_active',
             'updated_by', 'created_at', 'updated_at',
         ]
+        validators = []  # ← unique_together block সরানো হয়েছে
 
     def get_scope_display(self, obj): return obj.get_scope_display()
     def get_role_display(self, obj):  return obj.get_role_display()
+
+    def create(self, validated_data):
+        obj, created = ERPRolePermission.objects.update_or_create(
+            role=validated_data['role'],
+            permission=validated_data['permission'],
+            defaults={
+                'scope':      validated_data.get('scope', 'own'),
+                'is_active':  validated_data.get('is_active', True),
+                'updated_by': validated_data.get('updated_by', None),
+            }
+        )
+        return obj

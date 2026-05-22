@@ -23,7 +23,6 @@ class ERPPermissionSerializer(serializers.ModelSerializer):
     def get_module_display(self, obj): return obj.get_module_display()
     def get_action_display(self, obj): return obj.get_action_display()
 
-
 class ERPRolePermissionSerializer(serializers.ModelSerializer):
     permission_codename = serializers.ReadOnlyField(source='permission.codename')
     permission_module   = serializers.ReadOnlyField(source='permission.module')
@@ -39,10 +38,22 @@ class ERPRolePermissionSerializer(serializers.ModelSerializer):
             'scope', 'scope_display', 'is_active',
             'updated_by', 'created_at', 'updated_at',
         ]
+        validators = []  # ← এটা add করো
 
     def get_scope_display(self, obj): return obj.get_scope_display()
     def get_role_display(self, obj):  return obj.get_role_display()
 
+    def create(self, validated_data):
+        obj, created = ERPRolePermission.objects.update_or_create(
+            role=validated_data['role'],
+            permission=validated_data['permission'],
+            defaults={
+                'scope':      validated_data.get('scope', 'own'),
+                'is_active':  validated_data.get('is_active', True),
+                'updated_by': validated_data.get('updated_by', None),
+            }
+        )
+        return obj
 
 # =====================================================
 # views.py এ add করুন
@@ -77,16 +88,7 @@ class ERPRolePermissionListView(generics.ListAPIView):
 
 
 class ERPRolePermissionUpdateView(generics.UpdateAPIView):
-    """
-    PATCH /api/role-permissions/<id>/
-    Admin একটি permission এর scope বা is_active change করতে পারবে।
-
-    Request body:
-    {
-        "scope": "all",        ← 'own' বা 'all'
-        "is_active": false     ← permission বন্ধ করা
-    }
-    """
+  
     queryset         = ERPRolePermission.objects.all()
     serializer_class = ERPRolePermissionSerializer
     http_method_names = ['patch']
@@ -109,17 +111,7 @@ class ERPRolePermissionUpdateView(generics.UpdateAPIView):
 
 
 class ERPRolePermissionCreateView(generics.CreateAPIView):
-    """
-    POST /api/role-permissions/create/
-    Admin নতুন permission assign করতে পারবে।
-
-    Request body:
-    {
-        "role":       "marketing_officer",
-        "permission": 3,
-        "scope":      "own"
-    }
-    """
+    
     queryset         = ERPRolePermission.objects.all()
     serializer_class = ERPRolePermissionSerializer
 

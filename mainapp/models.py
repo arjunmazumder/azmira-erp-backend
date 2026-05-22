@@ -100,7 +100,7 @@ class ERPUser(AbstractBaseUser, PermissionsMixin):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     objects = ERPUserManager()
-    referred_by = models.CharField(max_length=255, blank=True, null=True)
+    referred_by = models.ForeignKey('self',on_delete=models.SET_NULL,null=True, blank=True,related_name='referred_users')
     USERNAME_FIELD = 'username'
     REQUIRED_FIELDS = ['email','full_name']
 
@@ -1839,6 +1839,11 @@ class ERPLandAcquisition(models.Model):
         self.outstanding_amount = self.total_value - self.amount_paid
         self.total_paid         = self.amount_paid
         super().save(*args, **kwargs)
+
+
+
+
+
 
 
 # =====================================================

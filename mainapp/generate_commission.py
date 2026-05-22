@@ -1,4 +1,7 @@
 from mainapp.hierarch import define_hierarchy
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from mainapp.models import Transaction
 
 
 percentage = {
@@ -66,5 +69,4 @@ def create_commission_table(pk):
         )
 
     
-
 

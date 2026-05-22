@@ -9,3 +9,5 @@ class MainappConfig(AppConfig):
 
     def ready(self):
         import mainapp.signals  # noqa — signals register করো
+
+

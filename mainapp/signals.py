@@ -251,3 +251,19 @@ def customer_post_delete(sender, instance, **kwargs):
         return
 
     _remove_role(instance.user, 'customer')
+
+
+
+# =====================================================
+# TRANSACTION SIGNALS
+# =====================================================
+
+from mainapp.models import Transaction
+from mainapp.generate_commission import create_commission_table 
+
+@receiver(post_save, sender=Transaction)
+def on_transaction_created(sender, instance, created, **kwargs):
+    print("🔥 TRANSACTION SIGNAL RUNNING")
+    if created:
+        print(f"Transaction ID: {instance.pk}")
+        create_commission_table(instance.pk)

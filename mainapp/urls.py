@@ -170,14 +170,24 @@ from mainapp.views import (
 
     # Dashboard
     erp_dashboard_summary,
+    # CommissionListView,
+    # CommissionDetailView,
+    # CommissionCreateView,
+    # CommissionUpdateView,
+    # CommissionDeleteView,
+    TransactionViewSet,
 
+)
+
+
+from mainapp.views import (
     CommissionListView,
     CommissionDetailView,
     CommissionCreateView,
     CommissionUpdateView,
     CommissionDeleteView,
-    TransactionViewSet,
-
+    CommissionMarkPaidView,
+    CommissionSummaryView,
 )
 
 # =====================================================
@@ -330,19 +340,18 @@ urlpatterns = [
     # # Trigger Commission
     # path('generate-commission/', GenerateCommissionView.as_view()),
 
-    path('commissions/',CommissionListView.as_view(),name='commission-list'),
+    # path('commissions/',CommissionListView.as_view(),name='commission-list'),
 
-    path('commissions/<int:pk>/',CommissionDetailView.as_view(),name='commission-detail'),
+    # path('commissions/<int:pk>/',CommissionDetailView.as_view(),name='commission-detail'),
 
-    path('commissions/create/',CommissionCreateView.as_view(),name='commission-create'),
+    # path('commissions/create/',CommissionCreateView.as_view(),name='commission-create'),
 
-    path('commissions/update/<int:pk>/',CommissionUpdateView.as_view(),name='commission-update'),
+    # path('commissions/update/<int:pk>/',CommissionUpdateView.as_view(),name='commission-update'),
 
-    path('commissions/delete/<int:pk>/',CommissionDeleteView.as_view(),name='commission-delete'),
+    # path('commissions/delete/<int:pk>/',CommissionDeleteView.as_view(),name='commission-delete'),
 
     #from claude 
-    path('commission-dashboard/', commission_dashboard, name='commission-dashboard'),
-    path('commission-dashboard/officer/<int:officer_id>/', officer_commission_detail, name='officer-commission-detail'),
+    
 
     # =====================================================
     # 15. LOAN
@@ -470,4 +479,16 @@ urlpatterns += [
     path('role-permissions/<int:pk>/',        ERPRolePermissionUpdateView.as_view(), name='role-permission-update'),
     path('role-permissions/<int:pk>/delete/', ERPRolePermissionDeleteView.as_view(), name='role-permission-delete'),
     path('role-permission-summary/',          role_permission_summary,               name='role-permission-summary'),
+]
+
+urlpatterns += [
+    path('commissions/',                        CommissionListView.as_view(),      name='commission-list'),
+    path('commissions/summary/',                CommissionSummaryView.as_view(),   name='commission-summary'),
+    path('commissions/create/',                 CommissionCreateView.as_view(),    name='commission-create'),
+    path('commissions/<int:pk>/',               CommissionDetailView.as_view(),    name='commission-detail'),
+    path('commissions/<int:pk>/update/',        CommissionUpdateView.as_view(),    name='commission-update'),
+    path('commissions/<int:pk>/delete/',        CommissionDeleteView.as_view(),    name='commission-delete'),
+    path('commissions/<int:pk>/mark-paid/',     CommissionMarkPaidView.as_view(),  name='commission-mark-paid'),
+    path('commission-dashboard/', commission_dashboard, name='commission-dashboard'),
+    path('commission-dashboard/officer/<int:officer_id>/', officer_commission_detail, name='officer-commission-detail'),
 ]
