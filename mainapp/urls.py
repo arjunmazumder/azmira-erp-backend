@@ -16,6 +16,7 @@ from mainapp.views import (
     ERPUserCreateView,
     erp_user_login,
     ERPUserByRoleView,
+    MyProfileView,
 
     # 2. Project
     ERPProjectListView,
@@ -176,6 +177,7 @@ from mainapp.views import (
     # CommissionUpdateView,
     # CommissionDeleteView,
     TransactionViewSet,
+    ALLRoleChoicesView,
 
 )
 
@@ -210,6 +212,8 @@ urlpatterns = [
     path('erp-users/new/', ERPUserCreateView.as_view(), name='erp-user-create'),
     path('erp-users/login/', erp_user_login, name='erp-user-login'),
     path('erp-users/role/<str:role>/', ERPUserByRoleView.as_view(), name='erp-user-by-role'),
+    path('my-profile/', MyProfileView.as_view(), name='my-profile'),
+    path('roles/', ALLRoleChoicesView.as_view(), name='all-role-choices'),
 
     # =====================================================
     # 2. PROJECT
@@ -238,9 +242,9 @@ urlpatterns = [
     # =====================================================
     # 5. CUSTOMER
     # =====================================================
-    path('erp-customers/', ERPCustomerListView.as_view(), name='erp-customer-list'),
-    path('erp-customers/<int:pk>/', ERPCustomerDetailView.as_view(), name='erp-customer-detail'),
+    path('erp-customers/',ERPCustomerListView.as_view(),   name='erp-customer-list'),
     path('erp-customers/new/', ERPCustomerCreateView.as_view(), name='erp-customer-create'),
+    path('erp-customers/<int:pk>/', ERPCustomerDetailView.as_view(), name='erp-customer-detail'),
 
     # =====================================================
     # 6. LEAD MANAGEMENT
@@ -262,13 +266,9 @@ urlpatterns = [
     # 8. INSTALLMENT PLAN
     # ?booking=<id>
     # =====================================================
-   # কিস্তির তালিকা দেখার জন্য
     path('erp-installments/', ERPInstallmentPlanListView.as_view(), name='installment-list'),
-    # অটো শিডিউল জেনারেট করার জন্য (বুকিং আইডিসহ)
     path('erp-installments/new/', ERPGenerateInstallmentScheduleView.as_view(), name='installment-generate'),
-    # নির্দিষ্ট কিস্তিতে পেমেন্ট বা আপডেট করার জন্য
     path('erp-installments/<int:pk>/', ERPInstallmentUpdateView.as_view(), name='installment-update'),
-    # নির্দিষ্ট বুকিং কোডের কিস্তি দেখার জন্য
     path('erp-installments/<str:booking_code>/', ERPBookingSpecificInstallmentListView.as_view(), name='booking-specific-installments'),
 
 

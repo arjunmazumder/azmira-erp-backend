@@ -344,42 +344,35 @@ class ERPLandRecordAdmin(admin.ModelAdmin):
 # 5. CUSTOMER
 # =====================================================
 
+
 @admin.register(ERPCustomer)
 class ERPCustomerAdmin(admin.ModelAdmin):
-    list_display = ('id', 'customer_code', 'full_name', 'phone', 'customer_type', 'source', 'referred_by', 'loyalty_points', 'is_active', 'created_at')
-    list_filter = ('customer_type', 'source', 'is_active')
-    search_fields = ('customer_code', 'full_name', 'phone', 'email', 'nid', 'father_name')
-    ordering = ('-created_at',)
-    readonly_fields = ('created_at', 'updated_at')
-    fieldsets = (
-        ('Basic Info', {
-            'fields': ('user', 'customer_code', 'full_name', 'customer_type', 'source')
-        }),
-        ('Family Info', {
-            'fields': ('father_name', 'mother_name', 'spouse_name')
-        }),
-        ('Contact', {
-            'fields': ('phone', 'phone_alt', 'email', 'nid', 'date_of_birth')
-        }),
-        ('Address', {
-            'fields': ('present_address', 'permanent_address')
-        }),
-        ('Marketing', {
-            'fields': ('referred_by', 'loyalty_points')
-        }),
-        ('Images', {
-            'fields': ('profile_image', 'nid_image')
-        }),
-        ('Status & Notes', {
-            'fields': ('is_active', 'notes')
-        }),
-        ('Audit', {
-            'fields': ('created_by', 'created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
+    
+    # ✅ property এর বদলে custom method ব্যবহার করুন
+    def full_name(self, obj):
+        return obj.user.full_name if obj.user else '-'
+    full_name.short_description = 'Full Name'
+
+    def phone(self, obj):
+        return obj.user.phone if obj.user else '-'
+    phone.short_description = 'Phone'
+
+    list_display = [
+        'customer_code',
+        'full_name',   # ✅ এখন method হিসেবে কাজ করবে
+        'phone',       # ✅
+        'customer_type',
+        'source',
+        'is_active',
+        'created_at',
+    ]
+
+    search_fields = ['customer_code', 'user__full_name', 'user__phone']
+    list_filter   = ['customer_type', 'source', 'is_active']
+    readonly_fields = ['customer_code', 'created_at', 'updated_at']
 
 
+    
 # =====================================================
 # 6. LEAD
 # =====================================================

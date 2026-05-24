@@ -15,6 +15,9 @@ from django.db import transaction
 from decimal import Decimal
 from rest_framework import viewsets, filters
 from rest_framework.generics import ListAPIView
+# views.py এর top এ
+from django.db.models import Sum, Count, Q, Avg, F
+from django.db import models 
 
 from mainapp.models import (
     ERPUser,
@@ -93,7 +96,23 @@ from mainapp.serializers import (
     ERPLandOwnerSerializer,
     ERPLandAcquisitionSerializer,
     TransactionSerializer,
+    ERPUserProfileSerializer
 )
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework import status
+from django.contrib.auth import authenticate
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.response import Response
+from .serializers import ERPUserProfileSerializer # আপনার সিরিয়ালাইজারটি ইমপোর্ট করুন
+
+# আপনার পারমিশন ফাইল থেকে ক্যাশ হেল্পারটি ইমপোর্ট করুন
+from accesscontrol.permissions import get_role_permissions 
 
 from rest_framework import generics, status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -107,12 +126,16 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny,IsAuthenticated
 from rest_framework import status
-from mainapp.api_permissions import(
-    IsSuperAdmin,
-    IsAdmin,
-    IsMarketingUser,
-    IsAccountsOfficer,
 
+from mainapp.api_permissions import (
+    HasModulePermission,
+    IsCustomer,
+    IsInvestor,
+    IsEmployee,
+    IsMarketingOfficer,
+    IsMarketingManager,
+    IsAdmin,
+    IsSuperAdmin,
 )
 
 # =====================================================
@@ -151,15 +174,73 @@ class ERPUserCreateView(generics.CreateAPIView):
 
 
 
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
-from rest_framework import status
-from django.contrib.auth import authenticate
-from rest_framework_simplejwt.tokens import RefreshToken
+from .accesscontrol import generate_access_control
+class MyProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
-# আপনার পারমিশন ফাইল থেকে ক্যাশ হেল্পারটি ইমপোর্ট করুন
-from accesscontrol.permissions import get_role_permissions 
+    def get(self, request):
+        """প্রোফাইল দেখা"""
+        user = request.user
+        user_data = ERPUserProfileSerializer(user, context={'request': request}).data
+
+        # 🔐 ডাইনামিক এক্সেস কন্ট্রোল জেনারেট করা
+        access_control = generate_access_control(user)
+        
+        # সিরিয়ালাইজড ডাটার ভেতরেই 'access_control' ঢুকিয়ে দেওয়া
+        user_data['access_control'] = access_control
+
+        return Response({
+            'success': True,
+            'data': {
+                'user': user_data,
+            }
+        })
+
+    def patch(self, request):
+        """প্রোফাইল আপডেট"""
+        user = request.user
+        user_serializer = ERPUserProfileSerializer(
+            user, data=request.data, partial=True, context={'request': request}
+        )
+
+        if not user_serializer.is_valid():
+            return Response({
+                'success': False,
+                'errors': user_serializer.errors
+            }, status=400)
+
+        user_serializer.save()
+        
+        # 🔐 আপডেট হওয়ার পর আবার নতুন করে পারমিশন চেক করা (যদি রোল চেঞ্জ হয়ে থাকে)
+        user_data = user_serializer.data
+        access_control = generate_access_control(user)
+        user_data['access_control'] = access_control
+
+        return Response({
+            'success': True,
+            'message': 'প্রোফাইল আপডেট সফল হয়েছে।',
+            'data': {
+                'user': user_data,
+            }
+        })
+
+
+class ALLRoleChoicesView(APIView):
+    permission_classes = [IsAuthenticated]  
+
+    def get(self, request):
+        # ERPUser মডেল থেকে ROLE_CHOICES নিয়ে আসা
+        choices = getattr(ERPUser, 'ROLE_CHOICES', [])
+        
+        # ফ্রন্টএন্ডের সুবিধার জন্য কি-ভ্যালু পেয়ার অবজেক্ট ফরম্যাটে রূপান্তর
+        formatted_roles = [{"id": key, "name": value} for key, value in choices]
+        
+        return Response({
+            "success": True,
+            "data": formatted_roles
+        })
+    
 
 
 @api_view(['POST'])
@@ -265,17 +346,8 @@ class ERPUserByRoleView(generics.ListAPIView):
 
 class ERPProjectListView(generics.ListAPIView):
   
-    def get_permissions(self):
-        """Action-এর বদলে request.method দিয়ে পারমিশন চেক করা হচ্ছে"""
-        # GET রিকোয়েস্ট ছাড়া বাকি সব (POST, PUT, PATCH, DELETE) এর জন্য IsAdmin চেক হবে
-        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
-            self.permission_classes = [IsAdmin] # অথবা IsAdminOrSuperAdmin
-        else:
-            self.permission_classes = [IsAuthenticated] # GET রিকোয়েস্টের জন্য শুধু লগইন থাকলেই হবে
-            
-        return super().get_permissions()
-    
-      
+    permission_classes = [HasModulePermission]
+    permission_module = 'project'    
     queryset = Project.objects.all()
     serializer_class = ERPProjectSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -303,30 +375,16 @@ class ERPProjectListView(generics.ListAPIView):
 
 
 class ERPProjectDetailView(generics.RetrieveUpdateDestroyAPIView):
-    def get_permissions(self):
-        """Action-এর বদলে request.method দিয়ে পারমিশন চেক করা হচ্ছে"""
-        # GET রিকোয়েস্ট ছাড়া বাকি সব (POST, PUT, PATCH, DELETE) এর জন্য IsAdmin চেক হবে
-        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
-            self.permission_classes = [IsAdmin] # অথবা IsAdminOrSuperAdmin
-        else:
-            self.permission_classes = [IsAuthenticated] # GET রিকোয়েস্টের জন্য শুধু লগইন থাকলেই হবে
-            
-        return super().get_permissions()
+    permission_classes = [HasModulePermission]
+    permission_module = 'project'     
     queryset = Project.objects.all()
     serializer_class = ERPProjectSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
 
 class ERPProjectCreateView(generics.CreateAPIView):
-    def get_permissions(self):
-        """Action-এর বদলে request.method দিয়ে পারমিশন চেক করা হচ্ছে"""
-        # GET রিকোয়েস্ট ছাড়া বাকি সব (POST, PUT, PATCH, DELETE) এর জন্য IsAdmin চেক হবে
-        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
-            self.permission_classes = [IsAdmin] # অথবা IsAdminOrSuperAdmin
-        else:
-            self.permission_classes = [IsAuthenticated] # GET রিকোয়েস্টের জন্য শুধু লগইন থাকলেই হবে
-            
-        return super().get_permissions()
+    permission_classes = [HasModulePermission]
+    permission_module = 'project' 
     queryset = Project.objects.all()
     serializer_class = ERPProjectSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
@@ -337,15 +395,8 @@ class ERPProjectCreateView(generics.CreateAPIView):
 # =====================================================
 
 class ERPPlotListView(generics.ListAPIView):
-    def get_permissions(self):
-            """Action-এর বদলে request.method দিয়ে পারমিশন চেক করা হচ্ছে"""
-            # GET রিকোয়েস্ট ছাড়া বাকি সব (POST, PUT, PATCH, DELETE) এর জন্য IsAdmin চেক হবে
-            if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
-                self.permission_classes = [IsAdmin] # অথবা IsAdminOrSuperAdmin
-            else:
-                self.permission_classes = [IsAuthenticated] # GET রিকোয়েস্টের জন্য শুধু লগইন থাকলেই হবে
-                
-            return super().get_permissions()
+    permission_classes = [HasModulePermission]
+    permission_module = 'plot'
    
     serializer_class = ERPPlotSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -380,42 +431,21 @@ class ERPPlotListView(generics.ListAPIView):
 
 
 class ERPPlotDetailView(generics.RetrieveUpdateDestroyAPIView):
-    def get_permissions(self):
-        """Action-এর বদলে request.method দিয়ে পারমিশন চেক করা হচ্ছে"""
-        # GET রিকোয়েস্ট ছাড়া বাকি সব (POST, PUT, PATCH, DELETE) এর জন্য IsAdmin চেক হবে
-        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
-            self.permission_classes = [IsAdmin] # অথবা IsAdminOrSuperAdmin
-        else:
-            self.permission_classes = [IsAuthenticated] # GET রিকোয়েস্টের জন্য শুধু লগইন থাকলেই হবে
-            
-        return super().get_permissions()
+    permission_classes = [HasModulePermission]
+    permission_module = 'plot'
     queryset = Property.objects.all()
     serializer_class = ERPPlotSerializer
 
 
 class ERPPlotCreateView(generics.CreateAPIView):
-    def get_permissions(self):
-        """Action-এর বদলে request.method দিয়ে পারমিশন চেক করা হচ্ছে"""
-        # GET রিকোয়েস্ট ছাড়া বাকি সব (POST, PUT, PATCH, DELETE) এর জন্য IsAdmin চেক হবে
-        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
-            self.permission_classes = [IsAdmin] # অথবা IsAdminOrSuperAdmin
-        else:
-            self.permission_classes = [IsAuthenticated] # GET রিকোয়েস্টের জন্য শুধু লগইন থাকলেই হবে
-            
-        return super().get_permissions()
+    permission_classes = [HasModulePermission]
+    permission_module = 'plot'
     queryset = Property.objects.all()
     serializer_class = ERPPlotSerializer
 
 class FeaturedPlotListAPIView(ListAPIView):
-    def get_permissions(self):
-        """Action-এর বদলে request.method দিয়ে পারমিশন চেক করা হচ্ছে"""
-        # GET রিকোয়েস্ট ছাড়া বাকি সব (POST, PUT, PATCH, DELETE) এর জন্য IsAdmin চেক হবে
-        if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
-            self.permission_classes = [IsAdmin] # অথবা IsAdminOrSuperAdmin
-        else:
-            self.permission_classes = [IsAuthenticated] # GET রিকোয়েস্টের জন্য শুধু লগইন থাকলেই হবে
-            
-        return super().get_permissions()
+    permission_classes = [HasModulePermission]
+    permission_module = 'plot'
     
     serializer_class = FeaturedPlotSerializer
     def get_queryset(self):
@@ -453,24 +483,157 @@ class ERPLandRecordCreateView(generics.CreateAPIView):
 # 5. CUSTOMER VIEWS
 # =====================================================
 
+
+# views.py
+
+from rest_framework import generics, status
+from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters
+from mainapp.models import ERPCustomer
+from mainapp.serializers import ERPCustomerSerializer
+from mainapp.api_permissions import HasModulePermission
+
+
+# =====================================================
+# LIST
+# =====================================================
+
 class ERPCustomerListView(generics.ListAPIView):
-    queryset = ERPCustomer.objects.all()
+    queryset         = ERPCustomer.objects.select_related('user').filter(is_active=True)
     serializer_class = ERPCustomerSerializer
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    parser_classes   = [MultiPartParser, FormParser, JSONParser]
+    permission_classes  = [HasModulePermission]
+    permission_module   = 'customer'
+
+    filter_backends  = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['customer_type', 'source', 'is_active']
+    search_fields    = ['user__full_name', 'user__phone', 'customer_code', 'notes']
+    ordering_fields  = ['created_at', 'loyalty_points']
+    ordering         = ['-created_at']
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page     = self.paginate_queryset(queryset)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={'request': request})
+            return self.get_paginated_response({
+                'success': True,
+                'data': serializer.data,
+            })
+
+        serializer = self.get_serializer(queryset, many=True, context={'request': request})
+        return Response({
+            'success': True,
+            'count'  : queryset.count(),
+            'data'   : serializer.data,
+        })
 
 
-class ERPCustomerDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = ERPCustomer.objects.all()
-    serializer_class = ERPCustomerSerializer
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
-
-
+# =====================================================
+# CREATE
+# =====================================================
 class ERPCustomerCreateView(generics.CreateAPIView):
-    queryset = ERPCustomer.objects.all()
+    queryset         = ERPCustomer.objects.all()
     serializer_class = ERPCustomerSerializer
+    parser_classes   = [MultiPartParser, FormParser, JSONParser]
+    permission_classes  = [HasModulePermission]
+    permission_module   = 'customer'
 
     def perform_create(self, serializer):
-        serializer.save(is_active=True)
+        # created_by serializer এর create() এ request থেকে নেওয়া হচ্ছে
+        # তাই এখানে আলাদা করে দেওয়ার দরকার নেই
+        serializer.save()
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(
+            data=request.data,
+            context={'request': request}
+        )
+        if serializer.is_valid():
+            self.perform_create(serializer)
+            return Response({
+                'success': True,
+                'message': 'Customer সফলভাবে তৈরি হয়েছে।',
+                'data'   : serializer.data,
+            }, status=status.HTTP_201_CREATED)
+
+        return Response({
+            'success': False,
+            'errors' : serializer.errors,
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+# =====================================================
+# DETAIL / UPDATE / DELETE
+# =====================================================
+class ERPCustomerDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset         = ERPCustomer.objects.select_related('user').all()
+    serializer_class = ERPCustomerSerializer
+    parser_classes   = [MultiPartParser, FormParser, JSONParser]
+    permission_classes  = [HasModulePermission]
+    permission_module   = 'customer'
+
+    def retrieve(self, request, *args, **kwargs):
+        instance   = self.get_object()
+        serializer = self.get_serializer(instance, context={'request': request})
+        return Response({
+            'success': True,
+            'data'   : serializer.data,
+        })
+
+    def update(self, request, *args, **kwargs):
+        partial    = kwargs.pop('partial', False)
+        instance   = self.get_object()
+        serializer = self.get_serializer(
+            instance, data=request.data,
+            partial=partial,
+            context={'request': request}
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'success': True,
+                'message': 'Customer আপডেট সফল হয়েছে।',
+                'data'   : serializer.data,
+            })
+
+        return Response({
+            'success': False,
+            'errors' : serializer.errors,
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs):
+        instance          = self.get_object()
+        instance.is_active = False
+        instance.save(update_fields=['is_active'])
+        return Response({
+            'success': True,
+            'message': 'Customer নিষ্ক্রিয় করা হয়েছে।',
+        }, status=status.HTTP_200_OK)
+
+
+
+# class ERPCustomerListView(generics.ListAPIView):
+#     queryset = ERPCustomer.objects.all()
+#     serializer_class = ERPCustomerSerializer
+#     parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+
+# class ERPCustomerDetailView(generics.RetrieveUpdateDestroyAPIView):
+#     queryset = ERPCustomer.objects.all()
+#     serializer_class = ERPCustomerSerializer
+#     parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+
+# class ERPCustomerCreateView(generics.CreateAPIView):
+#     queryset = ERPCustomer.objects.all()
+#     serializer_class = ERPCustomerSerializer
+
+#     def perform_create(self, serializer):
+#         serializer.save(is_active=True)
 
 
 # =====================================================
@@ -508,25 +671,34 @@ class ERPLeadCreateView(generics.CreateAPIView):
 # TRANACTIONS TABLE
 #=====================================================
 
+from mainapp.filters import TransactionFilter
 
 class TransactionViewSet(viewsets.ModelViewSet):
-    queryset = Transaction.objects.all()
+    queryset = Transaction.objects.select_related(
+        'customer', 'project', 'plot',
+        'referred_by', 'transferred_to'
+    ).all()
     serializer_class = TransactionSerializer
-    
+
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    
-    filterset_fields = ['transaction_type', 'customer', 'project', 'plot']
-    
-    search_fields = ['notes', 'customer__full_name']
-    
-    ordering_fields = ['created_at', 'amount']
+    filterset_class = TransactionFilter
+
+    search_fields = [
+        'notes',
+        'customer__full_name',
+        'project__name',
+        'referred_by__username',
+        'transferred_to__full_name',
+    ]
+
+    ordering_fields = ['created_at', 'updated_at', 'amount']
+    ordering = ['-created_at']
 
     def perform_create(self, serializer):
         if not self.request.data.get('referred_by'):
             serializer.save(referred_by=self.request.user)
         else:
             serializer.save()
-
 
 #==============================================================
 # Commission
@@ -546,36 +718,107 @@ from mainapp.serializers import CommissionSerializer
 # =====================================================
 
 class CommissionListView(generics.ListAPIView):
-    """
-    GET /commissions/
-    ?user=5
-    ?project=1
-    ?commission_type=booking
-    ?paid=true / ?paid=false
-    """
-    serializer_class = CommissionSerializer
+    serializer_class   = CommissionSerializer
+    permission_classes = [HasModulePermission]
+    permission_module  = 'commission'
+    filter_backends    = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+
+    # ── Search — %abc% style ──────────────────────────
+    search_fields  = [
+        'user__full_name',
+        'user__username',
+        'user__phone',
+        'project__project_name',
+        'project__project_code',
+        'plot__plot_number',
+        'commission_type',
+        'note',
+    ]
+
+    # ── Ordering ──────────────────────────────────────
+    ordering_fields = ['created_at', 'paid_at', 'commission', 'percent', 'level']
+    ordering        = ['-created_at']
 
     def get_queryset(self):
         qs = Commission.objects.select_related('user', 'project', 'plot').all()
 
-        user            = self.request.query_params.get('user')
-        project         = self.request.query_params.get('project')
-        commission_type = self.request.query_params.get('commission_type')
-        paid            = self.request.query_params.get('paid')
+        params = self.request.query_params
 
-        if user:
-            qs = qs.filter(user_id=user)
-        if project:
-            qs = qs.filter(project_id=project)
-        if commission_type:
-            qs = qs.filter(commission_type=commission_type)
-        if paid == 'true':
-            qs = qs.filter(paid_at__isnull=False)
-        elif paid == 'false':
-            qs = qs.filter(paid_at__isnull=True)
+        # ── Exact filters ─────────────────────────────
+        user            = params.get('user')
+        project         = params.get('project')
+        commission_type = params.get('commission_type')
+        paid            = params.get('paid')
+        level           = params.get('level')
+
+        if user:            qs = qs.filter(user_id=user)
+        if project:         qs = qs.filter(project_id=project)
+        if commission_type: qs = qs.filter(commission_type=commission_type)
+        if level:           qs = qs.filter(level=level)
+
+        if paid == 'true':  qs = qs.filter(paid_at__isnull=False)
+        elif paid == 'false': qs = qs.filter(paid_at__isnull=True)
+
+        # ── Date range filters ────────────────────────
+        date_from = params.get('date_from')  # ?date_from=2026-01-01
+        date_to   = params.get('date_to')    # ?date_to=2026-05-31
+
+        if date_from:
+            qs = qs.filter(created_at__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(created_at__date__lte=date_to)
+
+        # ── Paid date range ───────────────────────────
+        paid_from = params.get('paid_from')  # ?paid_from=2026-01-01
+        paid_to   = params.get('paid_to')    # ?paid_to=2026-05-31
+
+        if paid_from:
+            qs = qs.filter(paid_at__date__gte=paid_from)
+        if paid_to:
+            qs = qs.filter(paid_at__date__lte=paid_to)
+
+        # ── Commission amount range ───────────────────
+        amount_min = params.get('amount_min')  # ?amount_min=1000
+        amount_max = params.get('amount_max')  # ?amount_max=50000
+
+        if amount_min: qs = qs.filter(commission__gte=amount_min)
+        if amount_max: qs = qs.filter(commission__lte=amount_max)
 
         return qs
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page     = self.paginate_queryset(queryset)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={'request': request})
+            return self.get_paginated_response({
+                'success': True,
+                'data'   : serializer.data,
+            })
+
+        serializer = self.get_serializer(queryset, many=True, context={'request': request})
+
+        # ── Summary ───────────────────────────────────
+        from django.db.models import Sum, Count
+        summary = queryset.aggregate(
+            total_commission = Sum('commission'),
+            total_paid       = Sum('commission', filter=models.Q(paid_at__isnull=False)),
+            total_unpaid     = Sum('commission', filter=models.Q(paid_at__isnull=True)),
+            total_count      = Count('id'),
+        )
+
+        return Response({
+            'success': True,
+            'count'  : queryset.count(),
+            'summary': {
+                'total_commission': summary['total_commission'] or 0,
+                'total_paid'      : summary['total_paid']       or 0,
+                'total_unpaid'    : summary['total_unpaid']     or 0,
+                'total_count'     : summary['total_count']      or 0,
+            },
+            'data'   : serializer.data,
+        })
 
 class CommissionDetailView(generics.RetrieveAPIView):
     """GET /commissions/<id>/"""
@@ -645,6 +888,8 @@ class CommissionSummaryView(generics.ListAPIView):
         ).order_by('-total_commission')
 
         return Response(summary)
+
+
 
 # =====================================================
 # 7. BOOKING VIEWS
@@ -1538,10 +1783,6 @@ def commission_dashboard(request):
 
 @api_view(['GET'])
 def officer_commission_detail(request, officer_id):
-    """
-    GET /commission-dashboard/officer/<officer_id>/
-    একজন নির্দিষ্ট officer এর commission detail।
-    """
     from mainapp.models import ERPWallet
 
     try:
@@ -1549,8 +1790,12 @@ def officer_commission_detail(request, officer_id):
     except ERPUser.DoesNotExist:
         return Response({'error': 'Officer not found'}, status=404)
 
-    commissions = Commission.objects.filter(user=officer)
+    commissions = Commission.objects.filter(user=officer).select_related(
+        'project',
+        'plot',
+    )
 
+    # ── Generation summary ────────────────────────────────────────────────
     gen_summary = {}
     for comm in commissions:
         gen = comm.level
@@ -1570,20 +1815,23 @@ def officer_commission_detail(request, officer_id):
         else:
             gen_summary[gen]['pending_amount'] += comm.commission
 
-    gen_list = []
-    for gen, data in sorted(gen_summary.items()):
-        gen_list.append({
+    gen_list = [
+        {
             **data,
             'total_amount':   float(data['total_amount']),
             'paid_amount':    float(data['paid_amount']),
             'pending_amount': float(data['pending_amount']),
-        })
+        }
+        for _, data in sorted(gen_summary.items())
+    ]
 
+    # ── Overall aggregate ─────────────────────────────────────────────────
     overall = commissions.aggregate(
         total=Sum('commission'),
         paid=Sum('commission', filter=Q(paid_at__isnull=False)),
     )
 
+    # ── Wallet balance ────────────────────────────────────────────────────
     wallet_balance = 0
     try:
         wallet = ERPWallet.objects.get(user=officer)
@@ -1591,10 +1839,31 @@ def officer_commission_detail(request, officer_id):
     except Exception:
         pass
 
+    # ── Project & Property ────────────────────────────────────────────────
+    project_map  = {}
+    property_map = {}
+
+    for comm in commissions:
+        if comm.project_id and comm.project_id not in project_map:
+            project_map[comm.project_id] = {
+                'id':   comm.project.id,
+                'name': comm.project.project_name,
+            }
+
+        if comm.plot_id and comm.plot_id not in property_map:
+            prop = comm.plot
+            property_map[comm.plot_id] = {
+                'id':         prop.id,
+                'name':       prop.plot_number,
+                'project_id': comm.project_id,
+            }
+
     return Response({
         'officer': {
             'id':             officer.id,
+            'username':       officer.username,
             'name':           officer.full_name,
+            'roles':          officer.roles or [],
             'wallet_balance': wallet_balance,
         },
         'commission_summary': {
@@ -1603,7 +1872,10 @@ def officer_commission_detail(request, officer_id):
             'pending': float((overall['total'] or 0) - (overall['paid'] or 0)),
         },
         'by_level': gen_list,
+        'projects':   list(project_map.values()),
+        'properties': list(property_map.values()),
     })
+
 
 
 # =====================================================

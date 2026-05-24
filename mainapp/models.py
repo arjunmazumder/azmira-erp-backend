@@ -8,6 +8,10 @@ from decimal import Decimal
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.db.models import Sum
+import random
+from django.db import models, transaction
+from django.core.files.base import ContentFile
+
 
 
 
@@ -365,6 +369,7 @@ class ERPLandRecord(models.Model):
 # 5. CUSTOMER********************(DONE)
 # =====================================================
 
+
 class ERPCustomer(models.Model):
     CUSTOMER_TYPE_CHOICES = [
         ('individual', 'Individual'),
@@ -381,60 +386,139 @@ class ERPCustomer(models.Model):
         ('existing', 'Existing Customer'),
     ]
 
-    id = models.BigAutoField(primary_key=True)
-    user = models.OneToOneField(
-        ERPUser, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='customer_profile'
-    )
-    customer_code = models.CharField(max_length=50, unique=True)
-    full_name = models.CharField(max_length=200)
-    father_name = models.CharField(max_length=200, blank=True, null=True, default='')
-    mother_name = models.CharField(max_length=200, blank=True, null=True, default='')
-    spouse_name = models.CharField(max_length=200, blank=True, null=True, default='')
-    phone = models.CharField(max_length=20)
-    phone_alt = models.CharField(max_length=20, blank=True, null=True, default='')
-    email = models.EmailField(max_length=150, blank=True, null=True, default='')
-    nid = models.CharField(max_length=50, blank=True, null=True, default='')
-    date_of_birth = models.DateField(blank=True, null=True)
-    present_address = models.TextField(blank=True, null=True, default='')
-    permanent_address = models.TextField(blank=True, null=True, default='')
-    customer_type = models.CharField(max_length=20, choices=CUSTOMER_TYPE_CHOICES, default='individual')
-    source = models.CharField(max_length=30, choices=SOURCE_CHOICES, default='walk_in')
-    referred_by = models.ForeignKey(
-        'ERPUser', on_delete=models.SET_NULL,
-        null=True, blank=True,unique=True, related_name='referred_customers'
-    )
-    loyalty_points = models.IntegerField(default=0)
-    profile_image = models.ImageField(upload_to='erp/customers/', blank=True, null=True, default='')
-    nid_image = models.ImageField(upload_to='erp/customers/nid/', blank=True, null=True, default='')
-    is_active = models.BooleanField(default=True)
-    notes = models.TextField(blank=True, null=True, default='')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.CharField(max_length=100, blank=True, null=True, default='')
-    REQUIRED_FIELDS = ['referred_by','full_name','phone']
+    id               = models.BigAutoField(primary_key=True)
+    user             = models.OneToOneField(
+                           ERPUser, on_delete=models.SET_NULL,
+                           null=True, blank=True,
+                           related_name='customer_profile'
+                       )
+    customer_code    = models.CharField(max_length=50, unique=True, blank=True)
+    customer_type    = models.CharField(max_length=20, choices=CUSTOMER_TYPE_CHOICES, default='individual')
+    source           = models.CharField(max_length=30, choices=SOURCE_CHOICES, default='walk_in')
+    father_name      = models.CharField(max_length=200, blank=True, null=True, default='')
+    mother_name      = models.CharField(max_length=200, blank=True, null=True, default='')
+    spouse_name      = models.CharField(max_length=200, blank=True, null=True, default='')
+    phone_alt        = models.CharField(max_length=20, blank=True, null=True, default='')
+    present_address  = models.TextField(blank=True, null=True, default='')
+    permanent_address= models.TextField(blank=True, null=True, default='')
+    nid_image        = models.ImageField(upload_to='erp/customers/nid/', blank=True, null=True)
+    loyalty_points   = models.IntegerField(default=0)
+    notes            = models.TextField(blank=True, null=True, default='')
+    created_by       = models.CharField(max_length=100, blank=True, null=True, default='')
+    is_active        = models.BooleanField(default=True)
+    created_at       = models.DateTimeField(auto_now_add=True)
+    updated_at       = models.DateTimeField(auto_now=True)
 
-
-    class Meta:
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f'{self.customer_code} - {self.full_name}'
-
-    def save(self, *args, **kwargs):
-        for field in [self.profile_image, self.nid_image]:
-            if field and hasattr(field, 'file'):
+    @staticmethod
+    def _generate_unique_code():
+        with transaction.atomic():
+            last = ERPCustomer.objects.select_for_update().order_by('-id').last()
+            if last and last.customer_code:
                 try:
-                    img = Image.open(field)
-                    if img.mode in ('RGBA', 'P'):
-                        img = img.convert('RGB')
-                    img_io = BytesIO()
-                    img.save(img_io, format='WEBP', quality=80)
-                    new_filename = os.path.splitext(field.name)[0] + '.webp'
-                    field.save(new_filename, ContentFile(img_io.getvalue()), save=False)
-                except Exception as e:
-                    print(f'Image conversion failed: {e}')
+                    last_num = int(last.customer_code.split('-')[-1])
+                    next_num = last_num + 1
+                except (ValueError, IndexError):
+                    next_num = ERPCustomer.objects.count() + 1
+            else:
+                next_num = 1
+
+            while True:
+                code = f"ACL-{next_num:04d}"
+                if not ERPCustomer.objects.filter(customer_code=code).exists():
+                    return code
+                next_num += 1
+
+    # ✅ এটা _generate_unique_code এর সাথে same level এ থাকবে
+    def save(self, *args, **kwargs):
+        if not self.customer_code:
+            self.customer_code = self._generate_unique_code()
+
+        if self.nid_image and hasattr(self.nid_image, 'file'):
+            try:
+                img = Image.open(self.nid_image)
+                if img.mode in ('RGBA', 'P'):
+                    img = img.convert('RGB')
+                img_io = BytesIO()
+                img.save(img_io, format='WEBP', quality=80)
+                new_filename = os.path.splitext(self.nid_image.name)[0] + '.webp'
+                self.nid_image.save(new_filename, ContentFile(img_io.getvalue()), save=False)
+            except Exception as e:
+                print(f'NID image conversion failed: {e}')
+
         super().save(*args, **kwargs)
+
+
+
+# class ERPCustomer(models.Model):
+#     CUSTOMER_TYPE_CHOICES = [
+#         ('individual', 'Individual'),
+#         ('joint', 'Joint'),
+#         ('corporate', 'Corporate'),
+#     ]
+
+#     SOURCE_CHOICES = [
+#         ('walk_in', 'Walk In'),
+#         ('referral', 'Referral'),
+#         ('marketing', 'Marketing Officer'),
+#         ('online', 'Online'),
+#         ('advertisement', 'Advertisement'),
+#         ('existing', 'Existing Customer'),
+#     ]
+
+#     id = models.BigAutoField(primary_key=True)
+#     user = models.OneToOneField(
+#         ERPUser, on_delete=models.SET_NULL, null=True, blank=True,
+#         related_name='customer_profile'
+#     )
+#     customer_code = models.CharField(max_length=50, unique=True)
+#     full_name = models.CharField(max_length=200)
+#     father_name = models.CharField(max_length=200, blank=True, null=True, default='')
+#     mother_name = models.CharField(max_length=200, blank=True, null=True, default='')
+#     spouse_name = models.CharField(max_length=200, blank=True, null=True, default='')
+#     phone = models.CharField(max_length=20)
+#     phone_alt = models.CharField(max_length=20, blank=True, null=True, default='')
+#     email = models.EmailField(max_length=150, blank=True, null=True, default='')
+#     nid = models.CharField(max_length=50, blank=True, null=True, default='')
+#     date_of_birth = models.DateField(blank=True, null=True)
+#     present_address = models.TextField(blank=True, null=True, default='')
+#     permanent_address = models.TextField(blank=True, null=True, default='')
+#     customer_type = models.CharField(max_length=20, choices=CUSTOMER_TYPE_CHOICES, default='individual')
+#     source = models.CharField(max_length=30, choices=SOURCE_CHOICES, default='walk_in')
+#     referred_by = models.ForeignKey(
+#         'ERPUser', on_delete=models.SET_NULL,
+#         null=True, blank=True,unique=True, related_name='referred_customers'
+#     )
+#     loyalty_points = models.IntegerField(default=0)
+#     profile_image = models.ImageField(upload_to='erp/customers/', blank=True, null=True, default='')
+#     nid_image = models.ImageField(upload_to='erp/customers/nid/', blank=True, null=True, default='')
+#     is_active = models.BooleanField(default=True)
+#     notes = models.TextField(blank=True, null=True, default='')
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
+#     created_by = models.CharField(max_length=100, blank=True, null=True, default='')
+#     REQUIRED_FIELDS = ['referred_by','full_name','phone']
+
+
+#     class Meta:
+#         ordering = ['-created_at']
+
+#     def __str__(self):
+#         return f'{self.customer_code} - {self.full_name}'
+
+#     def save(self, *args, **kwargs):
+#         for field in [self.profile_image, self.nid_image]:
+#             if field and hasattr(field, 'file'):
+#                 try:
+#                     img = Image.open(field)
+#                     if img.mode in ('RGBA', 'P'):
+#                         img = img.convert('RGB')
+#                     img_io = BytesIO()
+#                     img.save(img_io, format='WEBP', quality=80)
+#                     new_filename = os.path.splitext(field.name)[0] + '.webp'
+#                     field.save(new_filename, ContentFile(img_io.getvalue()), save=False)
+#                 except Exception as e:
+#                     print(f'Image conversion failed: {e}')
+#         super().save(*args, **kwargs)
 
 
 # =====================================================
@@ -1243,6 +1327,7 @@ class ERPLoan(models.Model):
 # 16. INVESTOR***************(DONE)
 # =====================================================
 
+
 class ERPInvestor(models.Model):
     id = models.BigAutoField(primary_key=True)
     user = models.OneToOneField(ERPUser, on_delete=models.CASCADE, related_name='investor_profile')
@@ -1369,6 +1454,7 @@ class LandPowerAssignment(models.Model):
     def __str__(self):
         return f"Land Power for {self.investment.investment_id}"
 
+
 # =====================================================
 # 17. HR — EMPLOYEE, ATTENDANCE, PAYROLL (DONE)
 # =====================================================
@@ -1381,43 +1467,80 @@ class ERPEmployee(models.Model):
         ('intern', 'Intern'),
     ]
 
-    id = models.BigAutoField(primary_key=True)
-    user = models.OneToOneField(ERPUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='employee_profile')
-    employee_code = models.CharField(max_length=50, unique=True)
-    full_name = models.CharField(max_length=200)
-    department = models.CharField(max_length=100, blank=True, null=True, default='')
-    designation = models.CharField(max_length=100, blank=True, null=True, default='')
-    employment_type = models.CharField(max_length=20, choices=EMPLOYMENT_TYPE_CHOICES, default='permanent')
-    joining_date = models.DateField(blank=True, null=True)
-    phone = models.CharField(max_length=20, blank=True, null=True, default='')
-    email = models.EmailField(max_length=150, blank=True, null=True, default='')
-    address = models.TextField(blank=True, null=True, default='')
-    nid = models.CharField(max_length=50, blank=True, null=True, default='')
-    basic_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    bank_name = models.CharField(max_length=100, blank=True, null=True, default='')
-    bank_account = models.CharField(max_length=50, blank=True, null=True, default='')
-    profile_image = models.ImageField(upload_to='erp/employees/', blank=True, null=True, default='')
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    id               = models.BigAutoField(primary_key=True)
+    user             = models.OneToOneField(
+                           ERPUser, on_delete=models.SET_NULL,
+                           null=True, blank=True,
+                           related_name='employee_profile'
+                       )
+    employee_code    = models.CharField(max_length=50, unique=True, blank=True)
+    department       = models.CharField(max_length=100, blank=True, null=True, default='')
+    designation      = models.CharField(max_length=100, blank=True, null=True, default='')
+    employment_type  = models.CharField(max_length=20, choices=EMPLOYMENT_TYPE_CHOICES, default='permanent')
+    joining_date     = models.DateField(blank=True, null=True)
+    basic_salary     = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    bank_name        = models.CharField(max_length=100, blank=True, null=True, default='')
+    bank_account     = models.CharField(max_length=50, blank=True, null=True, default='')
+    is_active        = models.BooleanField(default=True)
+    created_at       = models.DateTimeField(auto_now_add=True)
+    updated_at       = models.DateTimeField(auto_now=True)
+
+    # ── ERPUser থেকে delegate করা properties ──────────
+    @property
+    def full_name(self):
+        return self.user.full_name if self.user else ''
+
+    @property
+    def phone(self):
+        return self.user.phone if self.user else ''
+
+    @property
+    def email(self):
+        return self.user.email if self.user else ''
+
+    @property
+    def address(self):
+        return self.user.address if self.user else ''
+
+    @property
+    def nid(self):
+        return self.user.nid if self.user else ''
+
+    @property
+    def profile_image(self):
+        return self.user.image if self.user else None
+
+    # ── Auto-generate employee_code ────────────────────
+    @staticmethod
+    def _generate_unique_code():
+        with transaction.atomic():
+            last = ERPEmployee.objects.select_for_update().order_by('-id').last()
+            if last and last.employee_code:
+                try:
+                    last_num = int(last.employee_code.split('-')[-1])
+                    next_num = last_num + 1
+                except (ValueError, IndexError):
+                    next_num = ERPEmployee.objects.count() + 1
+            else:
+                next_num = 1
+
+            while True:
+                code = f"EMP-{next_num:04d}"
+                if not ERPEmployee.objects.filter(employee_code=code).exists():
+                    return code
+                next_num += 1
+
+    def save(self, *args, **kwargs):
+        if not self.employee_code:
+            self.employee_code = self._generate_unique_code()
+        super().save(*args, **kwargs)
+
+    class Meta:
+        ordering = ['-created_at']
 
     def __str__(self):
         return f'{self.employee_code} - {self.full_name}'
-
-    def save(self, *args, **kwargs):
-        if self.profile_image and hasattr(self.profile_image, 'file'):
-            try:
-                img = Image.open(self.profile_image)
-                if img.mode in ('RGBA', 'P'):
-                    img = img.convert('RGB')
-                img_io = BytesIO()
-                img.save(img_io, format='WEBP', quality=80)
-                new_filename = os.path.splitext(self.profile_image.name)[0] + '.webp'
-                self.profile_image.save(new_filename, ContentFile(img_io.getvalue()), save=False)
-            except Exception as e:
-                print(f'Image conversion failed: {e}')
-        super().save(*args, **kwargs)
-
+    
 
 class ERPAttendance(models.Model):
     STATUS_CHOICES = [

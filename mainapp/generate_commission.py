@@ -18,6 +18,7 @@ percentage = {
 
 
 def commission(amount, referred_by):
+    print("i am in commission")
     upline=define_hierarchy(referred_by)
     com_data = []
     for index, user_id in enumerate(upline):
@@ -44,7 +45,7 @@ def commission(amount, referred_by):
 from mainapp.models import Transaction,Commission
 
 def create_commission_table(pk):
-
+    print("i am in create commission table")
     try:
         transaction = Transaction.objects.get(pk=pk)
         print(transaction)
@@ -57,6 +58,7 @@ def create_commission_table(pk):
 
     for item in com_data:
         print(item)
+
 
         Commission.objects.create(
             user_id=item["user_id"],

@@ -82,7 +82,7 @@ class ERPRolePermission(models.Model):
         on_delete=models.CASCADE,
         related_name='role_permissions'
     )
-    scope      = models.CharField(
+    scope = models.CharField(
         max_length=10,
         choices=SCOPE_CHOICES,
         default='own',

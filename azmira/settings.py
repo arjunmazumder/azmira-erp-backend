@@ -80,8 +80,8 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'azmira',             # ধাপ ১-এ Workbench-এ যে নাম দিয়েছেন
         'USER': 'root',                  # আপনার MySQL ইউজারনেম (ডিফল্ট root)
-        'PASSWORD': '1234',     # আপনার MySQL Workbench-এর পাসওয়ার্ড
-        'HOST': '127.0.0.1',             # লোকালহোস্ট আইপি
+        'PASSWORD': 'Test1234*',     # আপনার MySQL Workbench-এর পাসওয়ার্ড
+        'HOST': 'localhost',             # লোকালহোস্ট আইপি
         'PORT': '3306',                  # MySQL এর ডিফল্ট পোর্ট
     }
 }

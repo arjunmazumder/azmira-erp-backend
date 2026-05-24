@@ -134,6 +134,24 @@ class ERPUserCreateSerializer(serializers.ModelSerializer):
 
         return instance
 
+#==========================================================
+#ERPUserProfileSerializer
+#==========================================================
+
+class ERPUserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ERPUser
+        fields = [
+            'id', 'username', 'email', 'full_name', 'phone',
+            'address', 'nid', 'date_of_birth', 'image',
+            'roles', 'department',
+            'is_active', 'last_login', 'created_at',
+        ]
+        read_only_fields = [
+            'id', 'username', 'email', 'roles',
+            'department', 'is_active',
+            'last_login', 'created_at',
+        ]
 
 # ===== 2. PROJECT =====
 
@@ -187,15 +205,54 @@ class ERPLandRecordSerializer(serializers.ModelSerializer):
 # ===== 5. CUSTOMER =====
 
 class ERPCustomerSerializer(serializers.ModelSerializer):
-    referred_by = serializers.SerializerMethodField()
-    class Meta:
-        model = ERPCustomer
-        fields = '__all__'
-
-    def get_referred_by(self, obj):
-        if obj.referred_by and obj.referred_by.username:
-            return obj.referred_by.username
+    full_name     = serializers.SerializerMethodField()
+    phone         = serializers.SerializerMethodField()
+    email         = serializers.SerializerMethodField()
+    nid           = serializers.SerializerMethodField()
+    date_of_birth = serializers.SerializerMethodField()
+    profile_image = serializers.SerializerMethodField()
+    is_active     = serializers.SerializerMethodField()
+    user          = ERPUserSerializer(read_only=True)
+    user_id       = serializers.IntegerField(write_only=True, required=True)
+    def get_full_name(self, obj):     return obj.user.full_name if obj.user else ''
+    def get_phone(self, obj):         return obj.user.phone if obj.user else ''
+    def get_email(self, obj):         return obj.user.email if obj.user else ''
+    def get_nid(self, obj):           return obj.user.nid if obj.user else ''
+    def get_date_of_birth(self, obj): return obj.user.date_of_birth if obj.user else None
+    def get_is_active(self, obj):     return obj.user.is_active if obj.user else False
+    def get_profile_image(self, obj):
+        if obj.user and obj.user.image:
+            request = self.context.get('request')
+            return request.build_absolute_uri(obj.user.image.url) if request else obj.user.image.url
         return None
+    class Meta:
+        model  = ERPCustomer
+        fields = [
+            'id', 'customer_code', 'customer_type', 'source',
+            'user_id',        # write only
+            'user',           # ✅ user এর সব data (read only)
+            'full_name', 'phone', 'email', 'nid',
+            'date_of_birth', 'profile_image', 'is_active',
+            'father_name', 'mother_name', 'spouse_name',
+            'phone_alt', 'present_address', 'permanent_address',
+            'nid_image', 'loyalty_points',
+            'notes', 'created_by',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'customer_code', 'created_at', 'updated_at']
+
+
+
+# class ERPCustomerSerializer(serializers.ModelSerializer):
+#     referred_by = serializers.SerializerMethodField()
+#     class Meta:
+#         model = ERPCustomer
+#         fields = '__all__'
+
+#     def get_referred_by(self, obj):
+#         if obj.referred_by and obj.referred_by.username:
+#             return obj.referred_by.username
+#         return None
 
 # ===== 6. LEAD =====
 
@@ -256,6 +313,9 @@ class TransactionSerializer(serializers.ModelSerializer):
 
         return data
     
+
+
+    
 #=================================================
 # Commission serialiazer
 #=============================================
@@ -284,34 +344,56 @@ class CommissionSerializer(serializers.ModelSerializer):
 # ===== 7. BOOKING =====
 
 class ERPBookingSerializer(serializers.ModelSerializer):
-    # ক্যালকুলেটেড ফিল্ডগুলো read_only রাখা ভালো যাতে ইউজার ইনপুট না দিতে পারে
     final_price = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
-    total_paid = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
-    total_due = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
+    total_paid  = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
+    total_due   = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
 
     class Meta:
-        model = ERPBooking
+        model  = ERPBooking
         fields = '__all__'
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        
-        # রিলেশনাল ফিল্ডগুলোর নাম দেখানো
-        representation['customer'] = instance.customer.full_name if instance.customer else None
-        representation['plot'] = instance.plot.plot_number if instance.plot else None
-        representation['project'] = instance.project.project_name if instance.project else None
-        
-        # Marketing Officer হ্যান্ডেল করা
+
+        # Customer — user থাকলে full_name, না থাকলে customer_code fallback
+        if instance.customer:
+            representation['customer'] = (
+                instance.customer.user.full_name
+                if instance.customer.user
+                else instance.customer.customer_code
+            )
+        else:
+            representation['customer'] = None
+
+        # Plot
+        representation['plot'] = (
+            instance.plot.plot_number if instance.plot else None
+        )
+
+        # Project
+        representation['project'] = (
+            instance.project.project_name if instance.project else None
+        )
+
+        # Marketing Officer
         if instance.marketing_officer and instance.marketing_officer.user:
             representation['marketing_officer'] = instance.marketing_officer.user.full_name
         else:
             representation['marketing_officer'] = None
 
-        # Transfer Information
-        representation['transferred_to'] = instance.transferred_to.full_name if instance.transferred_to else None
-            
-        return representation
+        # Transferred To — user থাকলে full_name, না থাকলে customer_code fallback
+        if instance.transferred_to:
+            representation['transferred_to'] = (
+                instance.transferred_to.user.full_name
+                if instance.transferred_to.user
+                else instance.transferred_to.customer_code
+            )
+        else:
+            representation['transferred_to'] = None
 
+        return representation
+    
+    
 # ===== 8. INSTALLMENT PLAN =====
 
 class ERPInstallmentPlanSerializer(serializers.ModelSerializer):
@@ -577,18 +659,87 @@ class LandPowerAssignmentSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-# ===== 17. HR PayRoll =====
+# ===== 17. EMPLOYEE =====
+
 
 class ERPEmployeeSerializer(serializers.ModelSerializer):
-    user_name = serializers.SerializerMethodField()
+    # ── ERPUser সব data ──
+    user          = ERPUserSerializer(read_only=True)
+
+    # ── read fields ──
+    full_name     = serializers.SerializerMethodField()
+    phone         = serializers.SerializerMethodField()
+    email         = serializers.SerializerMethodField()
+    address       = serializers.SerializerMethodField()
+    nid           = serializers.SerializerMethodField()
+    profile_image = serializers.SerializerMethodField()
+    is_active     = serializers.SerializerMethodField()
+
+    # ── display ──
     employment_type_display = serializers.SerializerMethodField()
 
-    class Meta:
-        model = ERPEmployee
-        fields = '__all__'
+    # ── write only ──
+    user_id = serializers.IntegerField(write_only=True, required=True)
 
-    def get_user_name(self, obj): return obj.user.full_name if obj.user else None
+    def get_full_name(self, obj):     return obj.user.full_name if obj.user else ''
+    def get_phone(self, obj):         return obj.user.phone if obj.user else ''
+    def get_email(self, obj):         return obj.user.email if obj.user else ''
+    def get_address(self, obj):       return obj.user.address if obj.user else ''
+    def get_nid(self, obj):           return obj.user.nid if obj.user else ''
+    def get_is_active(self, obj):     return obj.user.is_active if obj.user else False
     def get_employment_type_display(self, obj): return obj.get_employment_type_display()
+
+    def get_profile_image(self, obj):
+        if obj.user and obj.user.image:
+            request = self.context.get('request')
+            return request.build_absolute_uri(obj.user.image.url) if request else obj.user.image.url
+        return None
+
+    class Meta:
+        model  = ERPEmployee
+        fields = [
+            'id', 'employee_code',
+            'user_id',                     # write only
+            'user',                        # ✅ সব user data
+            'full_name', 'phone', 'email', # read (shortcut)
+            'address', 'nid',
+            'profile_image', 'is_active',
+            'department', 'designation',
+            'employment_type', 'employment_type_display',
+            'joining_date',
+            'basic_salary', 'bank_name', 'bank_account',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'employee_code', 'created_at', 'updated_at']
+
+    def validate_user_id(self, value):
+        from mainapp.models import ERPUser
+        try:
+            user = ERPUser.objects.get(pk=value)
+        except ERPUser.DoesNotExist:
+            raise serializers.ValidationError('এই user পাওয়া যায়নি।')
+        if hasattr(user, 'employee_profile') and user.employee_profile:
+            raise serializers.ValidationError('এই user এর ইতিমধ্যে employee profile আছে।')
+        return value
+
+    def create(self, validated_data):
+        user_id = validated_data.pop('user_id')
+        from mainapp.models import ERPUser
+        user  = ERPUser.objects.get(pk=user_id)
+
+        roles = list(user.roles or [])
+        if 'employee' not in roles:
+            roles.append('employee')
+            user.roles = roles
+            user.save(update_fields=['roles'])
+
+        validated_data['user'] = user
+        return ERPEmployee.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data.pop('user_id', None)
+        return super().update(instance, validated_data)
+
 
 
 class ERPAttendanceSerializer(serializers.ModelSerializer):
