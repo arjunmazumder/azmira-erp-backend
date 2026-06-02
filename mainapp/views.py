@@ -535,23 +535,35 @@ class ERPCustomerListView(generics.ListAPIView):
 # =====================================================
 # CREATE
 # =====================================================
+
 class ERPCustomerCreateView(generics.CreateAPIView):
-    queryset         = ERPCustomer.objects.all()
-    serializer_class = ERPCustomerSerializer
-    parser_classes   = [MultiPartParser, FormParser, JSONParser]
+    queryset            = ERPCustomer.objects.all()
+    serializer_class    = ERPCustomerSerializer
+    parser_classes      = [MultiPartParser, FormParser, JSONParser]
     permission_classes  = [HasModulePermission]
     permission_module   = 'customer'
 
-    def perform_create(self, serializer):
-        # created_by serializer এর create() এ request থেকে নেওয়া হচ্ছে
-        # তাই এখানে আলাদা করে দেওয়ার দরকার নেই
-        serializer.save()
-
     def create(self, request, *args, **kwargs):
+        # existing customer check
+        user_id = request.data.get('user_id')
+
+        if not user_id:
+            return Response({
+                'success': False,
+                'message': 'user_id দেওয়া আবশ্যক।',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if ERPCustomer.objects.filter(user_id=user_id).exists():
+            return Response({
+                'success': False,
+                'message': 'এই user এর জন্য ইতিমধ্যে একটি customer account আছে।',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = self.get_serializer(
             data=request.data,
             context={'request': request}
         )
+
         if serializer.is_valid():
             self.perform_create(serializer)
             return Response({
@@ -560,12 +572,17 @@ class ERPCustomerCreateView(generics.CreateAPIView):
                 'data'   : serializer.data,
             }, status=status.HTTP_201_CREATED)
 
+        print("ERRORS:", serializer.errors)
         return Response({
             'success': False,
             'errors' : serializer.errors,
         }, status=status.HTTP_400_BAD_REQUEST)
 
+    def perform_create(self, serializer):
+        serializer.save(created_by=str(self.request.user))
 
+
+        
 # =====================================================
 # DETAIL / UPDATE / DELETE
 # =====================================================
@@ -616,24 +633,6 @@ class ERPCustomerDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 
-# class ERPCustomerListView(generics.ListAPIView):
-#     queryset = ERPCustomer.objects.all()
-#     serializer_class = ERPCustomerSerializer
-#     parser_classes = [MultiPartParser, FormParser, JSONParser]
-
-
-# class ERPCustomerDetailView(generics.RetrieveUpdateDestroyAPIView):
-#     queryset = ERPCustomer.objects.all()
-#     serializer_class = ERPCustomerSerializer
-#     parser_classes = [MultiPartParser, FormParser, JSONParser]
-
-
-# class ERPCustomerCreateView(generics.CreateAPIView):
-#     queryset = ERPCustomer.objects.all()
-#     serializer_class = ERPCustomerSerializer
-
-#     def perform_create(self, serializer):
-#         serializer.save(is_active=True)
 
 
 # =====================================================
@@ -694,11 +693,14 @@ class TransactionViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at', 'updated_at', 'amount']
     ordering = ['-created_at']
 
+    # def perform_create(self, serializer):
+    #     if not self.request.data.get('referred_by'):
+    #         serializer.save(referred_by=self.request.user)
+    #     else:
+    #         serializer.save()
     def perform_create(self, serializer):
-        if not self.request.data.get('referred_by'):
-            serializer.save(referred_by=self.request.user)
-        else:
-            serializer.save()
+        serializer.save()
+
 
 #==============================================================
 # Commission

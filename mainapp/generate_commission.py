@@ -49,17 +49,19 @@ def create_commission_table(pk):
     try:
         transaction = Transaction.objects.get(pk=pk)
         print(transaction)
-
     except Transaction.DoesNotExist:
         print("Transaction not found")
         return None
-    
+
+    # referred_by না থাকলে commission দরকার নেই
+    if not transaction.referred_by:
+        print("No referred_by — commission skipped")
+        return None
+
     com_data = commission(transaction.amount, transaction.referred_by.id)
 
     for item in com_data:
         print(item)
-
-
         Commission.objects.create(
             user_id=item["user_id"],
             project=transaction.project,
@@ -69,6 +71,3 @@ def create_commission_table(pk):
             commission=item["commission"],
             commission_type=transaction.transaction_type
         )
-
-    
-

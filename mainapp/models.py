@@ -92,7 +92,6 @@ class ERPUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(max_length=254, unique=True)
     full_name = models.CharField(max_length=200)
     phone = models.CharField(max_length=20, blank=True, null=True, default='')
-    address = models.TextField(blank=True, null=True, default='')
     nid = models.CharField(max_length=50, blank=True, null=True, default='')
     date_of_birth = models.DateField(blank=True, null=True)
     image = models.ImageField(upload_to='erp/users/', blank=True, null=True)
@@ -103,6 +102,15 @@ class ERPUser(AbstractBaseUser, PermissionsMixin):
     last_login = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    father_name      = models.CharField(max_length=200, blank=True, null=True, default='')
+    mother_name      = models.CharField(max_length=200, blank=True, null=True, default='')
+    spouse_name      = models.CharField(max_length=200, blank=True, null=True, default='')
+    phone_alt        = models.CharField(max_length=20, blank=True, null=True, default='')
+    present_address  = models.TextField(blank=True, null=True, default='')
+    permanent_address= models.TextField(blank=True, null=True, default='')
+    nid_image        = models.ImageField(upload_to='erp/customers/nid/', blank=True, null=True)
+    loyalty_points   = models.IntegerField(default=0)
+    notes            = models.TextField(blank=True, null=True, default='')
     objects = ERPUserManager()
     referred_by = models.ForeignKey('self',on_delete=models.SET_NULL,null=True, blank=True,related_name='referred_users')
     USERNAME_FIELD = 'username'
@@ -386,28 +394,25 @@ class ERPCustomer(models.Model):
         ('existing', 'Existing Customer'),
     ]
 
-    id               = models.BigAutoField(primary_key=True)
-    user             = models.OneToOneField(
-                           ERPUser, on_delete=models.SET_NULL,
-                           null=True, blank=True,
-                           related_name='customer_profile'
-                       )
-    customer_code    = models.CharField(max_length=50, unique=True, blank=True)
-    customer_type    = models.CharField(max_length=20, choices=CUSTOMER_TYPE_CHOICES, default='individual')
-    source           = models.CharField(max_length=30, choices=SOURCE_CHOICES, default='walk_in')
-    father_name      = models.CharField(max_length=200, blank=True, null=True, default='')
-    mother_name      = models.CharField(max_length=200, blank=True, null=True, default='')
-    spouse_name      = models.CharField(max_length=200, blank=True, null=True, default='')
-    phone_alt        = models.CharField(max_length=20, blank=True, null=True, default='')
-    present_address  = models.TextField(blank=True, null=True, default='')
-    permanent_address= models.TextField(blank=True, null=True, default='')
-    nid_image        = models.ImageField(upload_to='erp/customers/nid/', blank=True, null=True)
-    loyalty_points   = models.IntegerField(default=0)
-    notes            = models.TextField(blank=True, null=True, default='')
-    created_by       = models.CharField(max_length=100, blank=True, null=True, default='')
-    is_active        = models.BooleanField(default=True)
-    created_at       = models.DateTimeField(auto_now_add=True)
-    updated_at       = models.DateTimeField(auto_now=True)
+    id = models.BigAutoField(primary_key=True)
+    user = models.OneToOneField(
+            ERPUser,
+            on_delete=models.PROTECT,
+            related_name='customer_profile'
+        )
+    customer_code = models.CharField(max_length=50, unique=True, blank=True)
+    customer_type = models.CharField(max_length=20, choices=CUSTOMER_TYPE_CHOICES, default='individual')
+    source        = models.CharField(max_length=30, choices=SOURCE_CHOICES, default='walk_in')
+    created_by    = models.CharField(max_length=100, blank=True, null=True, default='')
+    is_active     = models.BooleanField(default=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
+    updated_at    = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.customer_code} - {self.user.full_name if self.user else "No User"}'
 
     @staticmethod
     def _generate_unique_code():
@@ -428,97 +433,11 @@ class ERPCustomer(models.Model):
                     return code
                 next_num += 1
 
-    # ✅ এটা _generate_unique_code এর সাথে same level এ থাকবে
     def save(self, *args, **kwargs):
         if not self.customer_code:
             self.customer_code = self._generate_unique_code()
-
-        if self.nid_image and hasattr(self.nid_image, 'file'):
-            try:
-                img = Image.open(self.nid_image)
-                if img.mode in ('RGBA', 'P'):
-                    img = img.convert('RGB')
-                img_io = BytesIO()
-                img.save(img_io, format='WEBP', quality=80)
-                new_filename = os.path.splitext(self.nid_image.name)[0] + '.webp'
-                self.nid_image.save(new_filename, ContentFile(img_io.getvalue()), save=False)
-            except Exception as e:
-                print(f'NID image conversion failed: {e}')
-
         super().save(*args, **kwargs)
 
-
-
-# class ERPCustomer(models.Model):
-#     CUSTOMER_TYPE_CHOICES = [
-#         ('individual', 'Individual'),
-#         ('joint', 'Joint'),
-#         ('corporate', 'Corporate'),
-#     ]
-
-#     SOURCE_CHOICES = [
-#         ('walk_in', 'Walk In'),
-#         ('referral', 'Referral'),
-#         ('marketing', 'Marketing Officer'),
-#         ('online', 'Online'),
-#         ('advertisement', 'Advertisement'),
-#         ('existing', 'Existing Customer'),
-#     ]
-
-#     id = models.BigAutoField(primary_key=True)
-#     user = models.OneToOneField(
-#         ERPUser, on_delete=models.SET_NULL, null=True, blank=True,
-#         related_name='customer_profile'
-#     )
-#     customer_code = models.CharField(max_length=50, unique=True)
-#     full_name = models.CharField(max_length=200)
-#     father_name = models.CharField(max_length=200, blank=True, null=True, default='')
-#     mother_name = models.CharField(max_length=200, blank=True, null=True, default='')
-#     spouse_name = models.CharField(max_length=200, blank=True, null=True, default='')
-#     phone = models.CharField(max_length=20)
-#     phone_alt = models.CharField(max_length=20, blank=True, null=True, default='')
-#     email = models.EmailField(max_length=150, blank=True, null=True, default='')
-#     nid = models.CharField(max_length=50, blank=True, null=True, default='')
-#     date_of_birth = models.DateField(blank=True, null=True)
-#     present_address = models.TextField(blank=True, null=True, default='')
-#     permanent_address = models.TextField(blank=True, null=True, default='')
-#     customer_type = models.CharField(max_length=20, choices=CUSTOMER_TYPE_CHOICES, default='individual')
-#     source = models.CharField(max_length=30, choices=SOURCE_CHOICES, default='walk_in')
-#     referred_by = models.ForeignKey(
-#         'ERPUser', on_delete=models.SET_NULL,
-#         null=True, blank=True,unique=True, related_name='referred_customers'
-#     )
-#     loyalty_points = models.IntegerField(default=0)
-#     profile_image = models.ImageField(upload_to='erp/customers/', blank=True, null=True, default='')
-#     nid_image = models.ImageField(upload_to='erp/customers/nid/', blank=True, null=True, default='')
-#     is_active = models.BooleanField(default=True)
-#     notes = models.TextField(blank=True, null=True, default='')
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     updated_at = models.DateTimeField(auto_now=True)
-#     created_by = models.CharField(max_length=100, blank=True, null=True, default='')
-#     REQUIRED_FIELDS = ['referred_by','full_name','phone']
-
-
-#     class Meta:
-#         ordering = ['-created_at']
-
-#     def __str__(self):
-#         return f'{self.customer_code} - {self.full_name}'
-
-#     def save(self, *args, **kwargs):
-#         for field in [self.profile_image, self.nid_image]:
-#             if field and hasattr(field, 'file'):
-#                 try:
-#                     img = Image.open(field)
-#                     if img.mode in ('RGBA', 'P'):
-#                         img = img.convert('RGB')
-#                     img_io = BytesIO()
-#                     img.save(img_io, format='WEBP', quality=80)
-#                     new_filename = os.path.splitext(field.name)[0] + '.webp'
-#                     field.save(new_filename, ContentFile(img_io.getvalue()), save=False)
-#                 except Exception as e:
-#                     print(f'Image conversion failed: {e}')
-#         super().save(*args, **kwargs)
 
 
 # =====================================================
@@ -611,6 +530,13 @@ class Transaction(models.Model):
         choices=TRANSACTION_TYPE,
         default='booking' 
     )
+
+    booking  = models.ForeignKey(
+        'ERPBooking',
+        on_delete=models.CASCADE,
+        related_name='transactions',
+        null=True, blank=True
+    )
     
     customer = models.ForeignKey(ERPCustomer, on_delete=models.CASCADE, related_name='customer_transactions')
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='project_transactions')
@@ -637,7 +563,10 @@ class Transaction(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.customer.full_name} - {self.get_transaction_type_display()} ({self.amount})"
+        full_name = self.customer.user.full_name if self.customer and self.customer.user else 'Unknown'
+        return f"{full_name} - {self.get_transaction_type_display()} ({self.amount})"
+
+
 
 
 
@@ -713,7 +642,14 @@ class Commission(models.Model):
 # 7. BOOKING*********************(DONE)
 # =====================================================
 
+from decimal import Decimal
+from datetime import date, timedelta
+from django.db import models
+from django.db.models import Sum
+
+
 class ERPBooking(models.Model):
+    
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('confirmed', 'Confirmed'),
@@ -730,94 +666,94 @@ class ERPBooking(models.Model):
         ('other', 'Other'),
     ]
 
-    id = models.BigAutoField(primary_key=True)
-    booking_code = models.CharField(max_length=50, unique=True)
-    customer = models.ForeignKey(ERPCustomer, on_delete=models.CASCADE, related_name='bookings')
-    plot = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='bookings')
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='bookings')
+    id                = models.BigAutoField(primary_key=True)
+    booking_code      = models.CharField(max_length=50, unique=True)
+    customer          = models.ForeignKey(ERPCustomer, on_delete=models.CASCADE, related_name='bookings')
+    plot              = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='bookings')
+    project           = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='bookings')
     marketing_officer = models.ForeignKey(
         'ERPMarketingOfficer', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='bookings'
     )
-    booking_date = models.DateField(default=date.today)
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending') 
+    booking_date      = models.DateField(default=date.today)
+    status            = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending')
 
-    total_price = models.DecimalField(max_digits=16, decimal_places=2)
-    discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    discount_note = models.CharField(max_length=200, blank=True, null=True, default='')
-    final_price = models.DecimalField(max_digits=16, decimal_places=2)
+    total_price      = models.DecimalField(max_digits=16, decimal_places=2)
+    discount_amount  = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    discount_note    = models.CharField(max_length=200, blank=True, null=True, default='')
+    final_price      = models.DecimalField(max_digits=16, decimal_places=2, default=0)
 
-    token_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    token_paid_date = models.DateField(blank=True, null=True)
+    token_amount      = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    token_paid_date   = models.DateField(blank=True, null=True)
     token_expiry_date = models.DateField(blank=True, null=True)
-    token_status = models.CharField(
+    token_status      = models.CharField(
         max_length=20,
         choices=[('active', 'Active'), ('expired', 'Expired'), ('demolished', 'Demolished')],
         default='active'
     )
 
     down_payment_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    down_payment_date = models.DateField(blank=True, null=True)
+    down_payment_date   = models.DateField(blank=True, null=True)
 
     total_paid = models.DecimalField(max_digits=16, decimal_places=2, default=0)
-    total_due = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    total_due  = models.DecimalField(max_digits=16, decimal_places=2, default=0)
 
     # Cancellation
     cancel_reason = models.CharField(max_length=30, choices=CANCEL_REASON_CHOICES, blank=True, null=True, default='')
-    cancel_date = models.DateField(blank=True, null=True)
-    cancel_note = models.TextField(blank=True, null=True, default='')
+    cancel_date   = models.DateField(blank=True, null=True)
+    cancel_note   = models.TextField(blank=True, null=True, default='')
     refund_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    refund_date = models.DateField(blank=True, null=True)
-    refund_note = models.TextField(blank=True, null=True, default='')
+    refund_date   = models.DateField(blank=True, null=True)
+    refund_note   = models.TextField(blank=True, null=True, default='')
 
     # Transfer
-    transferred_to = models.ForeignKey(
+    transferred_to          = models.ForeignKey(
         ERPCustomer, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='transferred_bookings'
     )
-    transfer_date = models.DateField(blank=True, null=True)
+    transfer_date           = models.DateField(blank=True, null=True)
     transfer_service_charge = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
-    notes = models.TextField(blank=True, null=True, default='')
+    notes      = models.TextField(blank=True, null=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.CharField(max_length=100, blank=True, null=True, default='')
+
     class Meta:
         ordering = ['-created_at']
+
     def __str__(self):
-        return f'{self.booking_code} - {self.customer.full_name}'
+        full_name = self.customer.user.full_name if self.customer and self.customer.user else 'Unknown'
+        return f'{self.booking_code} - {full_name}'
+
     def calculate_token_expiry(self):
         if not self.token_paid_date or not self.token_amount:
             return None
         amount = float(self.token_amount)
-        days = 30 if amount <= 500 else 60 if amount <= 1000 else 90
+        days   = 30 if amount <= 500 else 60 if amount <= 1000 else 90
         return self.token_paid_date + timedelta(days=days)
+
     def save(self, *args, **kwargs):
-        # ১. Final Price ক্যালকুলেশন
-        total = self.total_price or 0
-        discount = self.discount_amount or 0
+    # ১. Guard clause
+        update_fields = kwargs.get('update_fields')
+        if update_fields and set(update_fields) <= {'total_paid', 'total_due', 'updated_at'}:
+            super().save(*args, **kwargs)
+            return
+
+        # ২. Final Price
+        total         = self.total_price or 0
+        discount      = self.discount_amount or 0
         self.final_price = total - discount
 
-        # ২. Total Paid ক্যালকুলেশন (Token + Down Payment + All Installment Paid Amounts)
-        token = self.token_amount or 0
-        dp = self.down_payment_amount or 0
-        # কিস্তি থেকে আসা পেমেন্ট যোগ করা (এটাই আপনার মিসিং লজিক ছিল)
-        installment_payments = 0
-        if self.pk: # নিশ্চিত হওয়া যে বুকিংটি আগে তৈরি হয়েছে
-            installment_payments = self.installment_plan.aggregate(
-                total=Sum('paid_amount')
-            )['total'] or 0
-        
-        self.total_paid = Decimal(token) + Decimal(dp) + Decimal(installment_payments)
-
-        # ৩. Total Due ক্যালকুলেশন
+        # ৩. total_due — প্রথমবার total_paid=0, তাই final_price=total_due ✅
         self.total_due = self.final_price - self.total_paid
 
-        # ৪. টোকেন এক্সপায়ারি লজিক
+        # ৪. Token expiry
         if self.token_paid_date and self.token_amount and not self.token_expiry_date:
             self.token_expiry_date = self.calculate_token_expiry()
 
         super().save(*args, **kwargs)
+
 
 
 # =====================================================
@@ -1965,91 +1901,3 @@ class ERPLandAcquisition(models.Model):
 
 
 
-
-
-
-
-# =====================================================
-# 27. PERMISSION SYSTEM
-# =====================================================
-
-class ERPPermission(models.Model):
-
-    MODULE_CHOICES = [
-        ('project',         'Project'),
-        ('plot',            'Plot'),
-        ('booking',         'Booking'),
-        ('installment',     'Installment'),
-        ('receipt',         'Money Receipt'),
-        ('commission',      'Commission'),
-        ('wallet',          'Wallet'),
-        ('lead',            'Lead'),
-        ('attendance',      'Attendance'),
-        ('payroll',         'Payroll'),
-        ('investment',      'Investment'),
-        ('dividend',        'Dividend'),
-        ('officer_request', 'Officer Request'),
-        ('document',        'Document'),
-        ('offer',           'Offer'),
-    ]
-
-    ACTION_CHOICES = [
-        ('view',   'View'),
-        ('create', 'Create'),
-        ('edit',   'Edit'),
-        ('delete', 'Delete'),
-    ]
-
-    id          = models.BigAutoField(primary_key=True)
-    codename    = models.CharField(max_length=100, unique=True)
-    module      = models.CharField(max_length=50, choices=MODULE_CHOICES)
-    action      = models.CharField(max_length=20, choices=ACTION_CHOICES)
-    description = models.CharField(max_length=200, blank=True, null=True)
-    created_at  = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['module', 'action']
-        unique_together = [['module', 'action']]
-
-    def __str__(self):
-        return self.codename
-
-    def save(self, *args, **kwargs):
-        self.codename = f'{self.module}.{self.action}'
-        super().save(*args, **kwargs)
-
-
-class ERPRolePermission(models.Model):
-
-    ROLE_CHOICES = [
-        ('employee',          'Employee'),
-        ('marketing_officer', 'Marketing Officer'),
-        ('marketing_manager', 'Marketing Manager'),
-        ('customer',          'Customer'),
-        ('investor',          'Investor'),
-    ]
-
-    SCOPE_CHOICES = [
-        ('own', 'Own Data Only'),
-        ('all', 'All Data'),
-    ]
-
-    id         = models.BigAutoField(primary_key=True)
-    role       = models.CharField(max_length=50, choices=ROLE_CHOICES)
-    permission = models.ForeignKey(
-        ERPPermission,
-        on_delete=models.CASCADE,
-        related_name='role_permissions'
-    )
-    scope      = models.CharField(max_length=10, choices=SCOPE_CHOICES, default='own')
-    is_active  = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    updated_by = models.CharField(max_length=100, blank=True, null=True)
-
-    class Meta:
-        ordering = ['role', 'permission__module']
-        unique_together = [['role', 'permission']]
-
-    def __str__(self):
-        return f'{self.role} → {self.permission.codename} ({self.scope})'

@@ -233,13 +233,16 @@ def marketing_officer_post_delete(sender, instance, **kwargs):
 
 @receiver(post_save, sender='mainapp.ERPCustomer')
 def customer_post_save(sender, instance, created, **kwargs):
+    print(f"🔥 CUSTOMER SIGNAL - user: {instance.user}, is_active: {instance.is_active}")
 
     if instance.user is None:
+        print("❌ user is None, skipping")
         return
 
     if instance.is_active:
         _add_role(instance.user, 'customer')
         _get_or_create_wallet_safe(instance.user, 'customer')
+        print(f"✅ Role added - user roles: {instance.user.roles}")
     else:
         _remove_role(instance.user, 'customer')
 
@@ -258,12 +261,46 @@ def customer_post_delete(sender, instance, **kwargs):
 # TRANSACTION SIGNALS
 # =====================================================
 
+from decimal import Decimal
+from django.db.models import Sum
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+
 from mainapp.models import Transaction
-from mainapp.generate_commission import create_commission_table 
+from mainapp.generate_commission import create_commission_table
+
+
+def _refresh_booking_totals(booking):
+    transaction_total = booking.transactions.aggregate(
+        total=Sum('amount')
+    )['total'] or 0
+
+    print(f"DEBUG total from DB: {transaction_total}")  # ← এই লাইন যোগ করুন
+
+    booking.total_paid = Decimal(transaction_total)
+    booking.total_due  = booking.final_price - booking.total_paid
+
+    booking.save(update_fields=['total_paid', 'total_due', 'updated_at'])
+    print(f"DEBUG after save: {booking.total_paid}, {booking.total_due}")  # ← এটাও
+
 
 @receiver(post_save, sender=Transaction)
-def on_transaction_created(sender, instance, created, **kwargs):
+def on_transaction_saved(sender, instance, created, **kwargs):
     print("🔥 TRANSACTION SIGNAL RUNNING")
+
     if created:
         print(f"Transaction ID: {instance.pk}")
         create_commission_table(instance.pk)
+
+    print(f"DEBUG booking_id: {instance.booking_id}")  # ← এই লাইন যোগ করুন
+
+    if instance.booking_id:
+        print("DEBUG: calling _refresh_booking_totals")  # ← এটাও
+        _refresh_booking_totals(instance.booking)
+
+
+@receiver(post_delete, sender=Transaction)
+def on_transaction_deleted(sender, instance, **kwargs):
+    """Transaction delete হলেও booking update হবে"""
+    if instance.booking_id:
+        _refresh_booking_totals(instance.booking)

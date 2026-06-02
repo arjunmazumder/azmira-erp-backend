@@ -58,20 +58,19 @@ class ERPUserSerializer(serializers.ModelSerializer):
 # =====================================================
 # ৩. নতুন ইউজার তৈরি করার জন্য (রেজিস্ট্রেশন)
 # =====================================================
+from accesscontrol.serializers import ERPPermissionSerializer, ERPRolePermissionSerializer
 
 class ERPUserCreateSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True,required=True,style={'input_type': 'password'})
-    is_active = serializers.BooleanField(default=True, required=False)
-    roles = serializers.ListField(child=serializers.CharField(),required=False,default=list)
-    # Dynamic Properties (Read Only)
-    is_employee = serializers.ReadOnlyField()
-    is_customer = serializers.ReadOnlyField()
-    is_investor = serializers.ReadOnlyField()
+    password     = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+    is_active    = serializers.BooleanField(default=True, required=False)
+    roles        = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    is_employee  = serializers.ReadOnlyField()
+    is_customer  = serializers.ReadOnlyField()
+    is_investor  = serializers.ReadOnlyField()
     is_marketing = serializers.ReadOnlyField()
 
     class Meta:
-        model = ERPUser
-
+        model  = ERPUser
         fields = [
             'id',
             'username',
@@ -79,10 +78,15 @@ class ERPUserCreateSerializer(serializers.ModelSerializer):
             'password',
             'full_name',
             'phone',
-            'address',
+            'phone_alt',
+            'present_address',
+            'permanent_address',
+            'father_name',
+            'mother_name',
+            'spouse_name',
             'nid',
+            'nid_image',
             'date_of_birth',
-            'is_active',
             'image',
             'roles',
             'department',
@@ -97,7 +101,6 @@ class ERPUserCreateSerializer(serializers.ModelSerializer):
             'updated_at',
             'referred_by',
         ]
-
         read_only_fields = [
             'id',
             'last_login',
@@ -111,40 +114,37 @@ class ERPUserCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
-
-        user = ERPUser(**validated_data)
-
+        user     = ERPUser(**validated_data)
         if password:
             user.set_password(password)
-
         user.save()
-
         return user
 
     def update(self, instance, validated_data):
         password = validated_data.pop('password', None)
-
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-
         if password:
             instance.set_password(password)
-
         instance.save()
-
         return instance
+    
+
 
 #==========================================================
 #ERPUserProfileSerializer
 #==========================================================
+
 
 class ERPUserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = ERPUser
         fields = [
             'id', 'username', 'email', 'full_name', 'phone',
-            'address', 'nid', 'date_of_birth', 'image',
-            'roles', 'department',
+            'phone_alt', 'present_address', 'permanent_address',
+            'father_name', 'mother_name', 'spouse_name',
+            'nid', 'nid_image', 'date_of_birth', 'image',
+            'roles', 'department', 'loyalty_points',
             'is_active', 'last_login', 'created_at',
         ]
         read_only_fields = [
@@ -152,6 +152,7 @@ class ERPUserProfileSerializer(serializers.ModelSerializer):
             'department', 'is_active',
             'last_login', 'created_at',
         ]
+
 
 # ===== 2. PROJECT =====
 
@@ -202,46 +203,33 @@ class ERPLandRecordSerializer(serializers.ModelSerializer):
     def get_land_status_display(self, obj): return obj.get_land_status_display()
 
 
+
 # ===== 5. CUSTOMER =====
 
 class ERPCustomerSerializer(serializers.ModelSerializer):
-    full_name     = serializers.SerializerMethodField()
-    phone         = serializers.SerializerMethodField()
-    email         = serializers.SerializerMethodField()
-    nid           = serializers.SerializerMethodField()
-    date_of_birth = serializers.SerializerMethodField()
-    profile_image = serializers.SerializerMethodField()
-    is_active     = serializers.SerializerMethodField()
-    user          = ERPUserSerializer(read_only=True)
-    user_id       = serializers.IntegerField(write_only=True, required=True)
-    def get_full_name(self, obj):     return obj.user.full_name if obj.user else ''
-    def get_phone(self, obj):         return obj.user.phone if obj.user else ''
-    def get_email(self, obj):         return obj.user.email if obj.user else ''
-    def get_nid(self, obj):           return obj.user.nid if obj.user else ''
-    def get_date_of_birth(self, obj): return obj.user.date_of_birth if obj.user else None
-    def get_is_active(self, obj):     return obj.user.is_active if obj.user else False
-    def get_profile_image(self, obj):
-        if obj.user and obj.user.image:
-            request = self.context.get('request')
-            return request.build_absolute_uri(obj.user.image.url) if request else obj.user.image.url
-        return None
+    user    = ERPUserSerializer(read_only=True)
+    user_id = serializers.PrimaryKeyRelatedField(
+                queryset=ERPUser.objects.all(),
+                source='user',
+                write_only=True    # ← True করুন, GET এ user object আসবে
+              )
+    
+    is_active = serializers.BooleanField(default=True, required=False)
+
     class Meta:
         model  = ERPCustomer
         fields = [
-            'id', 'customer_code', 'customer_type', 'source',
-            'user_id',        # write only
-            'user',           # ✅ user এর সব data (read only)
-            'full_name', 'phone', 'email', 'nid',
-            'date_of_birth', 'profile_image', 'is_active',
-            'father_name', 'mother_name', 'spouse_name',
-            'phone_alt', 'present_address', 'permanent_address',
-            'nid_image', 'loyalty_points',
-            'notes', 'created_by',
-            'created_at', 'updated_at',
+            'id',
+            'customer_code',
+            'customer_type',
+            'source',
+            'user',        # GET এ পুরো object
+            'user_id',     # POST/PATCH এ id পাঠাবেন
+            'is_active',
+            'created_by',
+            'created_at',
+            'updated_at',
         ]
-        read_only_fields = ['id', 'customer_code', 'created_at', 'updated_at']
-
-
 
 # class ERPCustomerSerializer(serializers.ModelSerializer):
 #     referred_by = serializers.SerializerMethodField()
@@ -276,7 +264,6 @@ class ERPLeadSerializer(serializers.ModelSerializer):
 # TRANACTIONS TABLE
 #=====================================================
 
-
 class TransactionSerializer(serializers.ModelSerializer):
     transaction_type_display = serializers.CharField(
         source='get_transaction_type_display', 
@@ -289,31 +276,29 @@ class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = [
-            'id', 'transaction_type', 'transaction_type_display', 
-            'customer', 'customer_name', 'project', 'project_name', 
-            'plot', 'referred_by', 'amount', 'transferred_to', 
+            'id', 'transaction_type', 'transaction_type_display',
+            'booking',
+            'customer', 'customer_name', 'project', 'project_name',
+            'plot', 'referred_by', 'amount', 'transferred_to',
             'notes', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
     def validate(self, data):
-        
         transaction_type = data.get('transaction_type')
-        transferred_to = data.get('transferred_to')
+        transferred_to   = data.get('transferred_to')
 
         if transaction_type == 'transferred' and not transferred_to:
             raise serializers.ValidationError({
                 "transferred_to": "ট্রানজেকশন টাইপ 'Transferred' হলে কাকে ট্রান্সফার করা হচ্ছে (transferred_to) তা জানাতে হবে।"
             })
-            
+
         if transferred_to and data.get('customer') == transferred_to:
             raise serializers.ValidationError({
                 "transferred_to": "একই কাস্টমারকে নিজের অ্যাকাউন্টে ট্রান্সফার করা যাবে না।"
             })
 
         return data
-    
-
 
     
 #=================================================
@@ -953,7 +938,7 @@ class ERPLandAcquisitionSerializer(serializers.ModelSerializer):
 # 27. PERMISSION SERIALIZERS
 # =====================================================
 
-from mainapp.models import ERPPermission, ERPRolePermission
+from accesscontrol.models import ERPPermission, ERPRolePermission
 
 
 class ERPPermissionSerializer(serializers.ModelSerializer):

@@ -23,6 +23,7 @@ def define_hierarchy(start_id):
 
     
     while current_id:
+        print(f"upline =  {current_id}")
         up_line.append(current_id)
       
         current_id = up_line_id(current_id)

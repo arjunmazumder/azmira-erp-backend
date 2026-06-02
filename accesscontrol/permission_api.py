@@ -7,8 +7,7 @@ from rest_framework.filters import SearchFilter
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from mainapp.models import ERPPermission, ERPRolePermission
-
+from accesscontrol.models import ERPPermission, ERPRolePermission
 class ERPPermissionSerializer(serializers.ModelSerializer):
     module_display = serializers.SerializerMethodField()
     action_display = serializers.SerializerMethodField()
@@ -59,7 +58,6 @@ class ERPRolePermissionSerializer(serializers.ModelSerializer):
 # views.py এ add করুন
 # =====================================================
 
-from mainapp.models      import ERPPermission, ERPRolePermission
 from mainapp.serializers import ERPPermissionSerializer, ERPRolePermissionSerializer
 from accesscontrol.permissions     import clear_permission_cache
 

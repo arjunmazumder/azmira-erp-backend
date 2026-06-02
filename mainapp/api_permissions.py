@@ -1,5 +1,6 @@
 from rest_framework.permissions import BasePermission
-from mainapp.models import ERPRolePermission
+from accesscontrol.models import ERPRolePermission
+
 
 # --- হেল্পার ফাংশন (রোলস লিস্টকে ক্লিন করার জন্য) ---
 def get_clean_roles(user):
