@@ -2,7 +2,7 @@
 # python manage.py seed_permissions
 
 from django.core.management.base import BaseCommand
-from mainapp.models import ERPPermission, ERPRolePermission
+from accesscontrol.models import ERPPermission, ERPRolePermission
 
 
 ALL_PERMISSIONS = [
