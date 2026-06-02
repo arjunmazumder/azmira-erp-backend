@@ -56,7 +56,6 @@ class ERPUserAdmin(admin.ModelAdmin):
         'created_at'
     )
 
-    # শুধু DB fields রাখুন
     list_filter = (
         'roles',
         'department',
@@ -69,7 +68,6 @@ class ERPUserAdmin(admin.ModelAdmin):
         'email',
         'phone',
         'nid',
-        'employee_id'
     )
 
     ordering = ('-created_at',)
@@ -85,7 +83,7 @@ class ERPUserAdmin(admin.ModelAdmin):
             'fields': (
                 'username',
                 'email',
-                'password_hash'
+                'password',
             )
         }),
 
@@ -93,39 +91,60 @@ class ERPUserAdmin(admin.ModelAdmin):
             'fields': (
                 'full_name',
                 'phone',
-                'address',
-                'nid',
+                'phone_alt',
                 'date_of_birth',
-                'image'
+                'nid',
+                'nid_image',
+                'image',
             )
+        }),
+
+        ('Family Info', {
+            'fields': (
+                'father_name',
+                'mother_name',
+                'spouse_name',
+            ),
+            'classes': ('collapse',)
+        }),
+
+        ('Address', {
+            'fields': (
+                'present_address',
+                'permanent_address',
+            ),
+            'classes': ('collapse',)
         }),
 
         ('Role & Department', {
             'fields': (
                 'roles',
                 'department',
-                'employee_id'
+                'referred_by',
             )
         }),
 
-        # OPTIONAL: show as read-only info instead of editable fields
-        ('Status Flags (Auto)', {
+        ('Status', {
             'fields': (
                 'is_active',
+                'is_staff',
+                'loyalty_points',
+                'notes',
             ),
             'classes': ('collapse',)
         }),
 
         ('Audit', {
             'fields': (
-                'created_by',
                 'created_at',
                 'updated_at',
-                'last_login'
+                'last_login',
             ),
             'classes': ('collapse',)
         }),
     )
+
+
 # =====================================================
 # 2. PROJECT
 # =====================================================

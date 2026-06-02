@@ -510,52 +510,44 @@ class ERPLead(models.Model):
 #======================================================
 # TRANACTIONS TABLE
 #=====================================================
-
-
+# models.py
 class Transaction(models.Model):
     TRANSACTION_TYPE = [
-        ('booking', 'Booking'),
+        ('booking_money', 'Booking-Money'),
         ('down_payment', 'Down-payment'),
         ('installment', 'Installment'),
         ('token_money', 'Token-Money'),
         ('advance', 'Advance'),
         ('loan', 'Loan'),
-        ('transferred', 'Transferred'),
+        ('transfer', 'Transfer'),
+        ('investment', 'Investment'),
+        ('registration', 'Registration'),
+        ('land_development', 'Land-Development'),
+        ('parking', 'Parking'),
+        ('utility', 'Utility'),
+        ('others', 'Others'),
     ]
-    
-    id = models.BigAutoField(primary_key=True)
-    
-    transaction_type = models.CharField(
-        max_length=20, 
-        choices=TRANSACTION_TYPE,
-        default='booking' 
-    )
 
-    booking  = models.ForeignKey(
-        'ERPBooking',
-        on_delete=models.CASCADE,
-        related_name='transactions',
-        null=True, blank=True
+    id               = models.BigAutoField(primary_key=True)
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPE, default='booking_money')
+    booking          = models.ForeignKey(
+        'ERPBooking', on_delete=models.CASCADE,
+        related_name='transactions', null=True, blank=True
     )
-    
-    customer = models.ForeignKey(ERPCustomer, on_delete=models.CASCADE, related_name='customer_transactions')
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='project_transactions')
-    plot = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='plot_transactions')
-    
-    referred_by = models.ForeignKey(
+    customer         = models.ForeignKey(ERPCustomer, on_delete=models.CASCADE, related_name='customer_transactions', null=True, blank=True,)
+    user             = models.ForeignKey(ERPUser, null=True, blank=True, on_delete=models.SET_NULL, related_name='user_transactions')
+    project          = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='project_transactions')
+    plot             = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='plot_transactions')
+    referred_by      = models.ForeignKey(
         ERPUser, on_delete=models.SET_NULL,
-        null=True, blank=True,  
-        related_name='referred_transactions'
+        null=True, blank=True, related_name='referred_transactions'
     )
-    
-    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    
-    transferred_to = models.ForeignKey(
+    amount           = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    transferred_to   = models.ForeignKey(
         ERPCustomer, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='received_transfers'
     )
-
-    notes = models.TextField(blank=True, null=True)
+    notes      = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -565,9 +557,6 @@ class Transaction(models.Model):
     def __str__(self):
         full_name = self.customer.user.full_name if self.customer and self.customer.user else 'Unknown'
         return f"{full_name} - {self.get_transaction_type_display()} ({self.amount})"
-
-
-
 
 
 #======================================================
@@ -649,7 +638,7 @@ from django.db.models import Sum
 
 
 class ERPBooking(models.Model):
-    
+
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('confirmed', 'Confirmed'),

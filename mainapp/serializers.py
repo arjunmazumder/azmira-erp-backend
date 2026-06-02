@@ -266,21 +266,26 @@ class ERPLeadSerializer(serializers.ModelSerializer):
 
 class TransactionSerializer(serializers.ModelSerializer):
     transaction_type_display = serializers.CharField(
-        source='get_transaction_type_display', 
+        source='get_transaction_type_display',
         read_only=True
     )
-    
-    customer_name = serializers.CharField(source='customer.full_name', read_only=True)
-    project_name = serializers.CharField(source='project.name', read_only=True)
+    customer_name = serializers.CharField(source='customer.user.full_name', read_only=True)
+    project_name  = serializers.CharField(source='project.project_name', read_only=True)
 
     class Meta:
-        model = Transaction
+        model  = Transaction
         fields = [
             'id', 'transaction_type', 'transaction_type_display',
             'booking',
-            'customer', 'customer_name', 'project', 'project_name',
-            'plot', 'referred_by', 'amount', 'transferred_to',
-            'notes', 'created_at', 'updated_at'
+            'customer', 'customer_name',
+            'project', 'project_name',
+            'plot',
+            'user',
+            'referred_by',
+            'amount',
+            'transferred_to',
+            'notes',
+            'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
@@ -288,19 +293,19 @@ class TransactionSerializer(serializers.ModelSerializer):
         transaction_type = data.get('transaction_type')
         transferred_to   = data.get('transferred_to')
 
-        if transaction_type == 'transferred' and not transferred_to:
+        # 'transfer' type এ transferred_to থাকতে হবে
+        if transaction_type == 'transfer' and not transferred_to:
             raise serializers.ValidationError({
-                "transferred_to": "ট্রানজেকশন টাইপ 'Transferred' হলে কাকে ট্রান্সফার করা হচ্ছে (transferred_to) তা জানাতে হবে।"
+                "transferred_to": "ট্রানজেকশন টাইপ 'Transfer' হলে কাকে ট্রান্সফার করা হচ্ছে (transferred_to) তা জানাতে হবে।"
             })
 
+        # নিজেকে নিজে transfer করা যাবে না
         if transferred_to and data.get('customer') == transferred_to:
             raise serializers.ValidationError({
                 "transferred_to": "একই কাস্টমারকে নিজের অ্যাকাউন্টে ট্রান্সফার করা যাবে না।"
             })
 
         return data
-
-    
 #=================================================
 # Commission serialiazer
 #=============================================
