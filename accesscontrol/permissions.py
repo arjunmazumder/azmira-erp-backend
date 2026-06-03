@@ -24,7 +24,7 @@ def get_role_permissions(role):
     if cached is not None:
         return cached
 
-    from mainapp.models import ERPRolePermission
+    from accesscontrol.models import ERPRolePermission
     role_perms = ERPRolePermission.objects.filter(
         role=role,
         is_active=True
