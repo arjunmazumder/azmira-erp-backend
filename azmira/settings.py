@@ -68,23 +68,23 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'azmira.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
 # DATABASES = {
 #     'default': {
-#         'ENGINE': 'django.db.backends.mysql',
-#         'NAME': 'azmira',             # ধাপ ১-এ Workbench-এ যে নাম দিয়েছেন
-#         'USER': 'root',                  # আপনার MySQL ইউজারনেম (ডিফল্ট root)
-#         'PASSWORD': 'Test1234*',     # আপনার MySQL Workbench-এর পাসওয়ার্ড
-#         'HOST': 'localhost',             # লোকালহোস্ট আইপি
-#         'PORT': '3306',                  # MySQL এর ডিফল্ট পোর্ট
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
 #     }
 # }
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'azmira',             # ধাপ ১-এ Workbench-এ যে নাম দিয়েছেন
+        'USER': 'root',                  # আপনার MySQL ইউজারনেম (ডিফল্ট root)
+        'PASSWORD': 'Test1234*',     # আপনার MySQL Workbench-এর পাসওয়ার্ড
+        'HOST': 'localhost',             # লোকালহোস্ট আইপি
+        'PORT': '3306',                  # MySQL এর ডিফল্ট পোর্ট
+    }
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {

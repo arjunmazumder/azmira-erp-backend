@@ -1275,17 +1275,17 @@ class ERPInvestor(models.Model):
         return f'{self.investor_code} - {self.user.full_name}'
 
     def save(self, *args, **kwargs):
-        # ── নতুন investor হলে code generate করো ──
         if not self.investor_code:
-            last = ERPInvestor.objects.order_by('-id').first()
-            if last and last.investor_code:
-                try:
-                    last_num = int(last.investor_code.split('-')[-1])
-                except ValueError:
+            with transaction.atomic():
+                last = ERPInvestor.objects.select_for_update().order_by('-id').first()
+                if last and last.investor_code:
+                    try:
+                        last_num = int(last.investor_code.split('-')[-1])
+                    except ValueError:
+                        last_num = 0
+                else:
                     last_num = 0
-            else:
-                last_num = 0
-            self.investor_code = f'ASH-{str(last_num + 1).zfill(4)}'
+                self.investor_code = f'ASH-{str(last_num + 1).zfill(4)}'
         super().save(*args, **kwargs)
 
 
@@ -1340,17 +1340,17 @@ class ERPInvestment(models.Model):
         return f'{self.investor} - {self.invest_amount}'
 
     def save(self, *args, **kwargs):
-        # ── নতুন investment হলে ID generate করো ──
         if not self.investment_id:
-            last = ERPInvestment.objects.order_by('-id').first()
-            if last and last.investment_id:
-                try:
-                    last_num = int(last.investment_id.split('-')[-1])
-                except ValueError:
+            with transaction.atomic():
+                last = ERPInvestment.objects.select_for_update().order_by('-id').first()
+                if last and last.investment_id:
+                    try:
+                        last_num = int(last.investment_id.split('-')[-1])
+                    except ValueError:
+                        last_num = 0
+                else:
                     last_num = 0
-            else:
-                last_num = 0
-            self.investment_id = f'ID-{str(last_num + 1).zfill(4)}'
+                self.investment_id = f'ID-{str(last_num + 1).zfill(4)}'
         super().save(*args, **kwargs) 
 
         
