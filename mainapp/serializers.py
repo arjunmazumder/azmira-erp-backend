@@ -8,7 +8,7 @@ from mainapp.models import (
     ERPCommissionRule, ERPCommission, ERPLoan, ERPInvestor, ERPInvestment,
     ERPDividend, ERPEmployee, ERPAttendance, ERPPayroll, ERPOfficerRequest,
     ERPAccountHead, ERPOffer, ERPSMSLog, ERPDocument, ERPCompanyAsset, ERPSystemLog,
-    LandPowerAssignment,Transaction
+    LandPowerAssignment,Transaction,ERPAttendanceSummary, ERPHoliday
 )
 
 
@@ -393,9 +393,8 @@ class ERPInstallmentPlanSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        # রিলেশন থেকে তথ্য দেখানো
         representation['booking_code'] = instance.booking.booking_code
-        representation['customer_name'] = instance.booking.customer.full_name
+        representation['customer_name'] = instance.booking.customer.user.full_name
         return representation
 
 
@@ -608,62 +607,73 @@ class ERPLoanSerializer(serializers.ModelSerializer):
 # ===== 16. INVESTOR =====
 
 class ERPInvestorSerializer(serializers.ModelSerializer):
-    user_name = serializers.ReadOnlyField(source='user.full_name')
+    user_name  = serializers.ReadOnlyField(source='user.full_name')
     user_phone = serializers.ReadOnlyField(source='user.phone')
     user_email = serializers.ReadOnlyField(source='user.email')
 
     class Meta:
-        model = ERPInvestor
+        model  = ERPInvestor
         fields = '__all__'
 
 
 class ERPInvestmentSerializer(serializers.ModelSerializer):
-    investor_code = serializers.ReadOnlyField(source='investor.investor_code')
-    investor_name = serializers.SerializerMethodField()
-    project_name = serializers.ReadOnlyField(source='project.project_name')
+    investor_code  = serializers.ReadOnlyField(source='investor.investor_code')
+    investor_name  = serializers.SerializerMethodField()
+    project_name   = serializers.ReadOnlyField(source='project.project_name')
     status_display = serializers.SerializerMethodField()
 
     class Meta:
-        model = ERPInvestment
+        model  = ERPInvestment
         fields = '__all__'
 
-    def get_investor_name(self, obj): return obj.investor.user.full_name if obj.investor else None
-    def get_status_display(self, obj): return obj.get_status_display()
+    def get_investor_name(self, obj):
+        return obj.investor.user.full_name if obj.investor else None
+
+    def get_status_display(self, obj):
+        return obj.get_status_display()
 
 
 class ERPDividendSerializer(serializers.ModelSerializer):
-    investor_code = serializers.ReadOnlyField(source='investor.investor_code')
-    investor_name = serializers.SerializerMethodField()
+    investor_code  = serializers.ReadOnlyField(source='investor.investor_code')
+    investor_name  = serializers.SerializerMethodField()
+    investment_id  = serializers.ReadOnlyField(source='investment.investment_id')
     status_display = serializers.SerializerMethodField()
 
     class Meta:
-        model = ERPDividend
+        model  = ERPDividend
         fields = '__all__'
 
-    def get_investor_name(self, obj): return obj.investor.user.full_name if obj.investor else None
-    def get_status_display(self, obj): return obj.get_status_display()
+    def get_investor_name(self, obj):
+        return obj.investor.user.full_name if obj.investor else None
+
+    def get_status_display(self, obj):
+        return obj.get_status_display()
+
 
 class LandPowerAssignmentSerializer(serializers.ModelSerializer):
+    investment_code = serializers.ReadOnlyField(source='investment.investment_id')
+
     class Meta:
-        model = LandPowerAssignment
+        model  = LandPowerAssignment
         fields = '__all__'
 
+        
 
 # ===== 17. EMPLOYEE =====
-
 
 class ERPEmployeeSerializer(serializers.ModelSerializer):
     # ── ERPUser সব data ──
     user          = ERPUserSerializer(read_only=True)
 
     # ── read fields ──
-    full_name     = serializers.SerializerMethodField()
-    phone         = serializers.SerializerMethodField()
-    email         = serializers.SerializerMethodField()
-    address       = serializers.SerializerMethodField()
-    nid           = serializers.SerializerMethodField()
-    profile_image = serializers.SerializerMethodField()
-    is_active     = serializers.SerializerMethodField()
+    full_name         = serializers.SerializerMethodField()
+    phone             = serializers.SerializerMethodField()
+    email             = serializers.SerializerMethodField()
+    present_address   = serializers.SerializerMethodField()
+    permanent_address = serializers.SerializerMethodField()
+    nid               = serializers.SerializerMethodField()
+    profile_image     = serializers.SerializerMethodField()
+    is_active         = serializers.SerializerMethodField()
 
     # ── display ──
     employment_type_display = serializers.SerializerMethodField()
@@ -671,12 +681,13 @@ class ERPEmployeeSerializer(serializers.ModelSerializer):
     # ── write only ──
     user_id = serializers.IntegerField(write_only=True, required=True)
 
-    def get_full_name(self, obj):     return obj.user.full_name if obj.user else ''
-    def get_phone(self, obj):         return obj.user.phone if obj.user else ''
-    def get_email(self, obj):         return obj.user.email if obj.user else ''
-    def get_address(self, obj):       return obj.user.address if obj.user else ''
-    def get_nid(self, obj):           return obj.user.nid if obj.user else ''
-    def get_is_active(self, obj):     return obj.user.is_active if obj.user else False
+    def get_full_name(self, obj):          return obj.user.full_name if obj.user else ''
+    def get_phone(self, obj):              return obj.user.phone if obj.user else ''
+    def get_email(self, obj):              return obj.user.email if obj.user else ''
+    def get_present_address(self, obj):    return obj.user.present_address if obj.user else ''
+    def get_permanent_address(self, obj):  return obj.user.permanent_address if obj.user else ''
+    def get_nid(self, obj):                return obj.user.nid if obj.user else ''
+    def get_is_active(self, obj):          return obj.user.is_active if obj.user else False
     def get_employment_type_display(self, obj): return obj.get_employment_type_display()
 
     def get_profile_image(self, obj):
@@ -689,10 +700,11 @@ class ERPEmployeeSerializer(serializers.ModelSerializer):
         model  = ERPEmployee
         fields = [
             'id', 'employee_code',
-            'user_id',                     # write only
-            'user',                        # ✅ সব user data
-            'full_name', 'phone', 'email', # read (shortcut)
-            'address', 'nid',
+            'user_id',                              # write only
+            'user',                                 # সব user data
+            'full_name', 'phone', 'email',          # read (shortcut)
+            'present_address', 'permanent_address', # ← fixed
+            'nid',
             'profile_image', 'is_active',
             'department', 'designation',
             'employment_type', 'employment_type_display',
@@ -715,7 +727,7 @@ class ERPEmployeeSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user_id = validated_data.pop('user_id')
         from mainapp.models import ERPUser
-        user  = ERPUser.objects.get(pk=user_id)
+        user = ERPUser.objects.get(pk=user_id)
 
         roles = list(user.roles or [])
         if 'employee' not in roles:
@@ -732,16 +744,108 @@ class ERPEmployeeSerializer(serializers.ModelSerializer):
 
 
 
+from rest_framework import serializers
+from django.utils import timezone
+from datetime import time
+
+
+# অফিস শুরুর সময় — এখান থেকে late নির্ধারণ হবে
+OFFICE_START_TIME = time(9, 0, 0)   # সকাল ৯টা
+
+from decimal import Decimal
+
+
 class ERPAttendanceSerializer(serializers.ModelSerializer):
-    employee_name = serializers.ReadOnlyField(source='employee.full_name')
-    employee_code = serializers.ReadOnlyField(source='employee.employee_code')
+    employee_name  = serializers.ReadOnlyField(source='employee.full_name')
+    employee_code  = serializers.ReadOnlyField(source='employee.employee_code')
     status_display = serializers.SerializerMethodField()
+    total_hours    = serializers.SerializerMethodField()
+
+    def get_status_display(self, obj):
+        return obj.get_status_display()
+
+    def get_total_hours(self, obj):
+        if obj.check_in and obj.check_out:
+            return round((obj.check_out - obj.check_in).total_seconds() / 3600, 2)
+        return float(obj.total_hours)
+
+    def validate(self, data):
+        check_in  = data.get('check_in')
+        check_out = data.get('check_out')
+
+        if check_in and check_out:
+            if check_out <= check_in:
+                raise serializers.ValidationError({
+                    'check_out': 'Check-out অবশ্যই check-in এর পরে হতে হবে।'
+                })
+            # ── total_hours auto calculate ──
+            delta = check_out - check_in
+            data['total_hours'] = Decimal(str(round(delta.total_seconds() / 3600, 2)))
+
+        return data
 
     class Meta:
-        model = ERPAttendance
+        model  = ERPAttendance
+        fields = '__all__'
+        read_only_fields = ['id', 'created_at']
+
+
+class ERPAttendanceSummarySerializer(serializers.ModelSerializer):
+    employee_name   = serializers.ReadOnlyField(source='employee.full_name')
+    employee_code   = serializers.ReadOnlyField(source='employee.employee_code')
+    month_display   = serializers.SerializerMethodField()
+    attendance_rate = serializers.SerializerMethodField()
+
+    def get_month_display(self, obj):
+        return obj.month.strftime('%B %Y')
+
+    def get_attendance_rate(self, obj):
+        if obj.total_days == 0:
+            return 0
+        return round((obj.present_days / obj.total_days) * 100, 1)
+
+    class Meta:
+        model  = ERPAttendanceSummary
+        fields = [
+            'id', 'employee_code', 'employee_name',
+            'month', 'month_display',
+            'total_days', 'present_days', 'absent_days',
+            'late_days', 'half_days', 'leave_days', 'holiday_days',
+            'total_hours', 'attendance_rate',
+            'created_at', 'updated_at',
+        ]
+
+
+class ERPCheckInSerializer(serializers.Serializer):
+    """Device বা App থেকে check-in এর জন্য"""
+    employee_id   = serializers.IntegerField()
+    device_log_id = serializers.CharField(required=False, allow_blank=True)
+    remarks       = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_employee_id(self, value):
+        if not ERPEmployee.objects.filter(pk=value, user__is_active=True).exists():
+            raise serializers.ValidationError('Employee পাওয়া যায়নি বা inactive।')
+        return value
+
+
+class ERPCheckOutSerializer(serializers.Serializer):
+    """Device বা App থেকে check-out এর জন্য"""
+    employee_id   = serializers.IntegerField()
+    device_log_id = serializers.CharField(required=False, allow_blank=True)
+    remarks       = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_employee_id(self, value):
+        today = timezone.localdate()
+        if not ERPAttendance.objects.filter(employee_id=value, attendance_date=today).exists():
+            raise serializers.ValidationError('আজকের check-in পাওয়া যায়নি।')
+        return value
+
+
+class ERPHolidaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = ERPHoliday
         fields = '__all__'
 
-    def get_status_display(self, obj): return obj.get_status_display()
 
 
 class ERPPayrollSerializer(serializers.ModelSerializer):
@@ -754,6 +858,9 @@ class ERPPayrollSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_payment_status_display(self, obj): return obj.get_payment_status_display()
+
+
+
 
 
 # ===== 18. OFFICER REQUEST =====

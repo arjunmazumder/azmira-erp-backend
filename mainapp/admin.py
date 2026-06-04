@@ -822,32 +822,99 @@ admin.site.register(LandPowerAssignment)
 # =====================================================
 # 17. HR
 # =====================================================
+from django.utils.safestring import mark_safe
 
 @admin.register(ERPEmployee)
 class ERPEmployeeAdmin(admin.ModelAdmin):
-    list_display = ('id', 'employee_code', 'full_name', 'department', 'designation', 'employment_type', 'basic_salary', 'is_active', 'joining_date')
-    list_filter = ('employment_type', 'is_active', 'department')
-    search_fields = ('employee_code', 'full_name', 'phone', 'email', 'nid')
-    ordering = ('-created_at',)
-    readonly_fields = ('created_at', 'updated_at')
+
+    # ── property গুলো admin এর জন্য method হিসেবে ──
+    def get_full_name(self, obj):
+        return obj.full_name
+    get_full_name.short_description = 'Full Name'
+
+    def get_is_active(self, obj):
+        return obj.is_active
+    get_is_active.short_description = 'Active'
+    get_is_active.boolean = True          # ✅ টিক/ক্রস আইকন দেখাবে
+
+    def get_phone(self, obj):
+        return obj.phone
+    get_phone.short_description = 'Phone'
+
+    def get_email(self, obj):
+        return obj.email
+    get_email.short_description = 'Email'
+
+    def get_present_address(self, obj):
+        return obj.present_address
+    get_present_address.short_description = 'Present Address'
+
+    def get_nid(self, obj):
+        return obj.nid
+    get_nid.short_description = 'NID'
+
+    def get_profile_image(self, obj):
+        if obj.profile_image:
+            return mark_safe(f'<img src="{obj.profile_image.url}" width="60" height="60" style="border-radius:6px;object-fit:cover"/>')
+        return '-'
+    get_profile_image.short_description = 'Photo'
+
+    # ── list view ─────────────────────────────────────
+    list_display = (
+        'id', 'employee_code', 'get_full_name',
+        'department', 'designation', 'employment_type',
+        'basic_salary', 'get_is_active', 'joining_date',
+    )
+
+    # ── filter (শুধু real fields) ─────────────────────
+    list_filter = (
+        'employment_type',
+        'department',
+        'user__is_active',    # ✅ related field দিয়ে
+    )
+
+    # ── search (শুধু real fields) ─────────────────────
+    search_fields = (
+        'employee_code',
+        'user__full_name',    # ✅
+        'user__phone',        # ✅
+        'user__email',        # ✅
+        'user__nid',          # ✅
+    )
+
+    ordering         = ('-created_at',)
+    readonly_fields  = (
+        'employee_code',
+        'get_full_name', 'get_phone', 'get_email',
+        'get_present_address', 'get_nid',
+        'get_is_active', 'get_profile_image',
+        'created_at', 'updated_at',
+    )
+
     fieldsets = (
         ('Employee Info', {
-            'fields': ('user', 'employee_code', 'full_name', 'department', 'designation', 'employment_type', 'joining_date', 'is_active')
+            'fields': (
+                'user', 'employee_code',
+                'get_full_name', 'department',
+                'designation', 'employment_type',
+                'joining_date', 'get_is_active',
+            )
         }),
         ('Contact', {
-            'fields': ('phone', 'email', 'address', 'nid')
+            'fields': ('get_phone', 'get_email', 'get_present_address', 'get_nid')
         }),
         ('Salary & Bank', {
             'fields': ('basic_salary', 'bank_name', 'bank_account')
         }),
-        ('Image', {
-            'fields': ('profile_image',)
+        ('Photo', {
+            'fields': ('get_profile_image',)
         }),
         ('Audit', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
+
 
 
 @admin.register(ERPAttendance)
@@ -857,6 +924,18 @@ class ERPAttendanceAdmin(admin.ModelAdmin):
     search_fields = ('employee__full_name', 'employee__employee_code', 'device_log_id')
     ordering = ('-attendance_date',)
     readonly_fields = ('created_at',)
+
+
+from django.contrib import admin
+from .models import ERPHoliday
+
+@admin.register(ERPHoliday)
+class ERPHolidayAdmin(admin.ModelAdmin):
+    list_display  = ['name', 'date', 'holiday_type']
+    list_filter   = ['holiday_type']
+    search_fields = ['name']
+    ordering      = ['date']
+
 
 
 @admin.register(ERPPayroll)

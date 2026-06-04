@@ -1950,7 +1950,8 @@ class ERPLoanCreateView(generics.CreateAPIView):
             status=status.HTTP_201_CREATED
         )
 
-# ✅ Repayment এর আলাদা endpoint — remaining_amount কমাবে
+
+
 class ERPLoanRepaymentView(generics.UpdateAPIView):
     serializer_class = ERPLoanSerializer
     http_method_names = ['patch']
@@ -2008,27 +2009,44 @@ class ERPLoanRepaymentView(generics.UpdateAPIView):
 # 16. INVESTOR VIEWS
 # =====================================================
 
+from decimal import Decimal, ROUND_HALF_UP
+from django.utils import timezone as tz
+from django.db import transaction
+
+
 class ERPInvestorListView(generics.ListAPIView):
-    queryset = ERPInvestor.objects.all()
-    serializer_class = ERPInvestorSerializer
+    serializer_class   = ERPInvestorSerializer
+    permission_classes = [IsAuthenticated]
 
-
-class ERPInvestorDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = ERPInvestor.objects.all()
-    serializer_class = ERPInvestorSerializer
+    def get_queryset(self):
+        qs        = ERPInvestor.objects.select_related('user').all()
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            qs = qs.filter(is_active=is_active.lower() == 'true')
+        return qs
 
 
 class ERPInvestorCreateView(generics.CreateAPIView):
-    queryset = ERPInvestor.objects.all()
-    serializer_class = ERPInvestorSerializer
+    queryset           = ERPInvestor.objects.all()
+    serializer_class   = ERPInvestorSerializer
+    permission_classes = [IsAuthenticated]
+
+
+
+class ERPInvestorDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset           = ERPInvestor.objects.select_related('user').all()
+    serializer_class   = ERPInvestorSerializer
+    permission_classes = [IsAuthenticated]
+
+
 
 
 class ERPInvestmentListView(generics.ListAPIView):
-    """GET /api/erp-investments/ — ?investor=<id>&status=<status>"""
-    serializer_class = ERPInvestmentSerializer
+    serializer_class   = ERPInvestmentSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = ERPInvestment.objects.all()
+        qs          = ERPInvestment.objects.select_related('investor__user', 'project').all()
         investor_id = self.request.query_params.get('investor')
         inv_status  = self.request.query_params.get('status')
         if investor_id:
@@ -2038,43 +2056,53 @@ class ERPInvestmentListView(generics.ListAPIView):
         return qs
 
 
-class ERPInvestmentDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = ERPInvestment.objects.all()
-    serializer_class = ERPInvestmentSerializer
-
-
 class ERPInvestmentCreateView(generics.CreateAPIView):
-    queryset = ERPInvestment.objects.all()
-    serializer_class = ERPInvestmentSerializer
+    queryset           = ERPInvestment.objects.all()
+    serializer_class   = ERPInvestmentSerializer
+    permission_classes = [IsAuthenticated]
 
+
+class ERPInvestmentDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset           = ERPInvestment.objects.select_related('investor__user', 'project').all()
+    serializer_class   = ERPInvestmentSerializer
+    permission_classes = [IsAuthenticated]
+
+
+# ─────────────────────────────────────────────
+# Dividend
+# ─────────────────────────────────────────────
 
 class ERPDividendListView(generics.ListAPIView):
-    """GET /api/erp-dividends/ — ?investor=<id>&investment=<id>"""
-    serializer_class = ERPDividendSerializer
+    serializer_class   = ERPDividendSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = ERPDividend.objects.all()
+        qs            = ERPDividend.objects.select_related('investor__user', 'investment').all()
         investor_id   = self.request.query_params.get('investor')
         investment_id = self.request.query_params.get('investment')
+        month         = self.request.query_params.get('month')
+        year          = self.request.query_params.get('year')
         if investor_id:
             qs = qs.filter(investor_id=investor_id)
         if investment_id:
             qs = qs.filter(investment_id=investment_id)
+        if month:
+            qs = qs.filter(month=month)
+        if year:
+            qs = qs.filter(year=year)
         return qs
 
 
 class ERPDividendDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = ERPDividend.objects.all()
-    serializer_class = ERPDividendSerializer
-
-
-from decimal import Decimal, ROUND_HALF_UP
-from django.utils import timezone as tz
+    queryset           = ERPDividend.objects.all()
+    serializer_class   = ERPDividendSerializer
+    permission_classes = [IsAuthenticated]
 
 
 class ERPDividendCreateView(generics.CreateAPIView):
-    queryset = ERPDividend.objects.all()
-    serializer_class = ERPDividendSerializer
+    queryset           = ERPDividend.objects.all()
+    serializer_class   = ERPDividendSerializer
+    permission_classes = [IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
         investment_id = request.data.get('investment')
@@ -2083,13 +2111,34 @@ class ERPDividendCreateView(generics.CreateAPIView):
 
         if not all([investment_id, month, year]):
             return Response(
-                {"error": "investment, month, and year are required"},
+                {'error': 'investment, month এবং year আবশ্যক।'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
-            investment = ERPInvestment.objects.select_related('investor__user').get(id=investment_id)
+            investment = ERPInvestment.objects.select_related(
+                'investor__user'
+            ).get(id=investment_id)
 
+            # ── Active কিনা চেক ──
+            if investment.status != 'active':
+                return Response(
+                    {'error': f'Investment টি active নয়, status: {investment.status}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # ── Duplicate চেক ──
+            if ERPDividend.objects.filter(
+                investment=investment,
+                month=month,
+                year=year
+            ).exists():
+                return Response(
+                    {'error': f'{month}/{year} মাসের dividend ইতিমধ্যে দেওয়া হয়েছে।'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # ── Calculate ──
             base_amount     = Decimal(str(investment.invest_amount))
             rate_percent    = Decimal(str(investment.monthly_dividend_rate))
             dividend_amount = (base_amount * rate_percent / Decimal('100')).quantize(
@@ -2103,85 +2152,336 @@ class ERPDividendCreateView(generics.CreateAPIView):
                 )
 
                 dividend = ERPDividend.objects.create(
-                    investment=investment,
-                    investor=investment.investor,
-                    month=month,
-                    year=year,
-                    base_amount=base_amount,
-                    dividend_rate=rate_percent,
-                    dividend_amount=dividend_amount,
-                    status='paid',
-                    wallet_credited=True,
-                    wallet_credited_at=tz.now()
+                    investment         = investment,
+                    investor           = investment.investor,
+                    month              = month,
+                    year               = year,
+                    base_amount        = base_amount,
+                    dividend_rate      = rate_percent,
+                    dividend_amount    = dividend_amount,
+                    status             = 'paid',
+                    wallet_credited    = True,
+                    wallet_credited_at = tz.now(),
                 )
 
                 wallet.balance += dividend_amount
                 wallet.save()
 
                 investment.total_profit_received += dividend_amount
-                investment.save()
+                investment.save(update_fields=['total_profit_received', 'updated_at'])
 
-            return Response(self.get_serializer(dividend).data, status=status.HTTP_201_CREATED)
+            return Response(
+                self.get_serializer(dividend).data,
+                status=status.HTTP_201_CREATED
+            )
 
         except ERPInvestment.DoesNotExist:
-            return Response({"error": "Investment not found"}, status=404)
+            return Response({'error': 'Investment পাওয়া যায়নি।'}, status=404)
         except ERPWallet.DoesNotExist:
-            return Response({"error": "Investor wallet not found"}, status=404)
+            return Response({'error': 'Investor wallet পাওয়া যায়নি।'}, status=404)
         except Exception as e:
-            return Response({"error": str(e)}, status=500)
+            return Response({'error': str(e)}, status=500)
 
+
+# ─────────────────────────────────────────────
+# Land Power
+# ─────────────────────────────────────────────
 class LandPowerViewSet(viewsets.ModelViewSet):
-    queryset = LandPowerAssignment.objects.all()
-    serializer_class = LandPowerAssignmentSerializer
+    queryset           = LandPowerAssignment.objects.select_related('investment').all()
+    serializer_class   = LandPowerAssignmentSerializer
+    permission_classes = [IsAuthenticated]
 
 
 
 # =====================================================
 # 17. HR VIEWS
 # =====================================================
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from mainapp.models import ERPEmployee
+from .serializers import ERPEmployeeSerializer
+
 
 class ERPEmployeeListView(generics.ListAPIView):
-    queryset = ERPEmployee.objects.filter(is_active=True)
-    serializer_class = ERPEmployeeSerializer
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    queryset           = ERPEmployee.objects.select_related('user').filter(user__is_active=True)
+    serializer_class   = ERPEmployeeSerializer
+    # permission_classes = [IsAuthenticated]
+    parser_classes     = [MultiPartParser, FormParser, JSONParser]
 
 
 class ERPEmployeeDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = ERPEmployee.objects.all()
-    serializer_class = ERPEmployeeSerializer
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    queryset           = ERPEmployee.objects.select_related('user').all()
+    serializer_class   = ERPEmployeeSerializer
+    # permission_classes = [IsAuthenticated]
+    parser_classes     = [MultiPartParser, FormParser, JSONParser]
 
 
 class ERPEmployeeCreateView(generics.CreateAPIView):
-    queryset = ERPEmployee.objects.all()
-    serializer_class = ERPEmployeeSerializer
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    queryset           = ERPEmployee.objects.all()
+    serializer_class   = ERPEmployeeSerializer
+    # permission_classes = [IsAuthenticated]
+    parser_classes     = [MultiPartParser, FormParser, JSONParser]
 
 
+from rest_framework import generics, status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from django.utils import timezone
+from datetime import time, date
+
+from mainapp.models import ERPAttendance, ERPAttendanceSummary, ERPEmployee
+from mainapp.serializers import (
+    ERPAttendanceSerializer,
+    ERPAttendanceSummarySerializer,
+    ERPCheckInSerializer,
+    ERPCheckOutSerializer,
+)
+from mainapp.tasks import generate_monthly_summary
+
+OFFICE_START_TIME = time(9, 0, 0)   # সকাল ৯টা
+
+
+# ─────────────────────────────────────────────────────
+# ১. Check-In View
+# ─────────────────────────────────────────────────────
+class ERPCheckInView(APIView):
+    """
+    POST /attendance/check-in/
+    { "employee_id": 1, "device_log_id": "DEV-001" }
+
+    - আজকে already check-in থাকলে error
+    - ৯টার পরে আসলে → late
+    - সব ঠিক থাকলে → present
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ERPCheckInSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        employee_id   = serializer.validated_data['employee_id']
+        device_log_id = serializer.validated_data.get('device_log_id', '')
+        remarks       = serializer.validated_data.get('remarks', '')
+
+        today    = timezone.localdate()
+        now      = timezone.localtime()
+        employee = ERPEmployee.objects.get(pk=employee_id)
+
+        # ── Already check-in আছে কিনা চেক ──
+        existing = ERPAttendance.objects.filter(
+            employee        = employee,
+            attendance_date = today
+        ).first()
+
+        if existing:
+            if existing.check_in:
+                return Response(
+                    {'detail': f'আজকে ইতিমধ্যে check-in হয়েছে {existing.check_in.strftime("%H:%M")} তে।'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # ── Late নির্ধারণ ──
+        attendance_status = 'present'
+        if now.time() > OFFICE_START_TIME:
+            attendance_status = 'late'
+
+        # ── Create বা Update ──
+        attendance, created = ERPAttendance.objects.update_or_create(
+            employee        = employee,
+            attendance_date = today,
+            defaults={
+                'check_in'      : now,
+                'status'        : attendance_status,
+                'device_log_id' : device_log_id,
+                'remarks'       : remarks,
+                'marked_by'     : 'Device' if device_log_id else str(request.user),
+            }
+        )
+
+        return Response({
+            'detail'    : 'Check-in সফল।',
+            'employee'  : employee.full_name,
+            'check_in'  : attendance.check_in.strftime('%H:%M'),
+            'status'    : attendance.status,
+            'date'      : str(today),
+        }, status=status.HTTP_200_OK)
+
+
+# ─────────────────────────────────────────────────────
+# ২. Check-Out View
+# ─────────────────────────────────────────────────────
+
+from decimal import Decimal
+
+
+class ERPCheckOutView(APIView):
+    """
+    POST /attendance/check-out/
+    { "employee_id": 1 }
+
+    - Check-in না থাকলে error
+    - Already check-out থাকলে error
+    - total_hours auto calculate
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ERPCheckOutSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        employee_id   = serializer.validated_data['employee_id']
+        device_log_id = serializer.validated_data.get('device_log_id', '')
+        remarks       = serializer.validated_data.get('remarks', '')
+
+        today      = timezone.localdate()
+        now        = timezone.localtime()
+
+        try:
+            attendance = ERPAttendance.objects.get(
+                employee_id     = employee_id,
+                attendance_date = today
+            )
+        except ERPAttendance.DoesNotExist:
+            return Response(
+                {'detail': 'আজকের check-in পাওয়া যায়নি।'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ── Already check-out আছে কিনা ──
+        if attendance.check_out:
+            return Response(
+                {'detail': f'আজকে ইতিমধ্যে check-out হয়েছে {attendance.check_out.strftime("%H:%M")} তে।'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ── total_hours calculate ──
+        total_hours = 0
+        if attendance.check_in:
+            delta       = now - attendance.check_in
+            total_hours = round(delta.total_seconds() / 3600, 2)
+
+        # ── half_day নির্ধারণ (৪ ঘণ্টার কম) ──
+        if 0 < total_hours < 4 and attendance.status not in ('leave', 'holiday'):
+            attendance.status = 'half_day'
+
+        attendance.check_out     = now
+        attendance.total_hours   = Decimal(str(total_hours))
+        attendance.device_log_id = device_log_id or attendance.device_log_id
+        attendance.remarks       = remarks or attendance.remarks
+        attendance.save(update_fields=['check_out', 'total_hours', 'status', 'device_log_id', 'remarks'])
+
+        return Response({
+            'detail'      : 'Check-out সফল।',
+            'employee'    : attendance.employee.full_name,
+            'check_in'    : attendance.check_in.strftime('%H:%M'),
+            'check_out'   : attendance.check_out.strftime('%H:%M'),
+            'total_hours' : float(attendance.total_hours),
+            'status'      : attendance.status,
+            'date'        : str(today),
+        }, status=status.HTTP_200_OK)
+# ─────────────────────────────────────────────────────
+# ৩. List / Detail / Create
+# ─────────────────────────────────────────────────────
 class ERPAttendanceListView(generics.ListAPIView):
-    """GET /api/erp-attendance/ — ?employee=<id>&month=<m>&year=<y>"""
-    serializer_class = ERPAttendanceSerializer
+    """GET /attendance/?employee=<id>&month=<m>&year=<y>&status=<s>"""
+    serializer_class   = ERPAttendanceSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = ERPAttendance.objects.all()
+        qs          = ERPAttendance.objects.select_related('employee__user').all()
         employee_id = self.request.query_params.get('employee')
         month       = self.request.query_params.get('month')
         year        = self.request.query_params.get('year')
-        if employee_id:
-            qs = qs.filter(employee_id=employee_id)
+        status      = self.request.query_params.get('status')
+
+        if employee_id: qs = qs.filter(employee_id=employee_id)
         if month and year:
-            qs = qs.filter(attendance_date__month=month, attendance_date__year=year)
+            qs = qs.filter(
+                attendance_date__month=month,
+                attendance_date__year=year
+            )
+        if status: qs = qs.filter(status=status)
         return qs
 
 
 class ERPAttendanceDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = ERPAttendance.objects.all()
-    serializer_class = ERPAttendanceSerializer
+    queryset           = ERPAttendance.objects.select_related('employee__user').all()
+    serializer_class   = ERPAttendanceSerializer
+    permission_classes = [IsAuthenticated]
 
 
 class ERPAttendanceCreateView(generics.CreateAPIView):
-    queryset = ERPAttendance.objects.all()
-    serializer_class = ERPAttendanceSerializer
+    """Manual attendance entry (HR এর জন্য)"""
+    queryset           = ERPAttendance.objects.all()
+    serializer_class   = ERPAttendanceSerializer
+    permission_classes = [IsAuthenticated]
+
+
+# ─────────────────────────────────────────────────────
+# ৪. Summary Views
+# ─────────────────────────────────────────────────────
+
+class ERPAttendanceSummaryListView(generics.ListAPIView):
+    serializer_class   = ERPAttendanceSummarySerializer
+    # permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs          = ERPAttendanceSummary.objects.select_related('employee__user').all()
+        employee_id = self.request.query_params.get('employee_id')
+        month       = self.request.query_params.get('month')   # 2024-01
+
+        if employee_id: qs = qs.filter(employee_id=employee_id)
+        if month:
+            year, m = month.split('-')
+            qs = qs.filter(month__year=year, month__month=m)
+        return qs
+
+
+
+from .tasks import generate_monthly_summary # task ইমপোর্ট করে নিন
+
+class GenerateMonthlySummaryView(APIView):
+    """POST /attendance/summary/generate/ { "month": "2024-01" }"""
+    # permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        month = request.data.get('month')
+        if month:
+            year, m = month.split('-')
+            # .delay() বাদ দিয়ে সরাসরি কল করুন
+            generate_monthly_summary(int(year), int(m)) 
+        else:
+            generate_monthly_summary()
+            
+        return Response({'message': 'Summary generated successfully.'})
+
+
+
+from mainapp.models import ERPHoliday
+from mainapp.serializers import ERPHolidaySerializer
+
+class ERPHolidayListCreateView(generics.ListCreateAPIView):
+    queryset           = ERPHoliday.objects.all()
+    serializer_class   = ERPHolidaySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs    = super().get_queryset()
+        year  = self.request.query_params.get('year')
+        month = self.request.query_params.get('month')
+        if year:  qs = qs.filter(date__year=year)
+        if month: qs = qs.filter(date__month=month)
+        return qs
+
+class ERPHolidayDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset           = ERPHoliday.objects.all()
+    serializer_class   = ERPHolidaySerializer
+    permission_classes = [IsAuthenticated]
+
+
 
 
 class ERPPayrollListView(generics.ListAPIView):

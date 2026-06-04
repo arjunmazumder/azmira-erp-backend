@@ -1256,24 +1256,38 @@ class ERPLoan(models.Model):
 class ERPInvestor(models.Model):
     id = models.BigAutoField(primary_key=True)
     user = models.OneToOneField(ERPUser, on_delete=models.CASCADE, related_name='investor_profile')
-    investor_code = models.CharField(max_length=50, unique=True)
-    marketing_officer = models.ForeignKey('ERPMarketingOfficer',on_delete=models.SET_NULL,null=True,blank=True,related_name='investors')
+    investor_code = models.CharField(max_length=50, unique=True, blank=True)
+    marketing_officer = models.ForeignKey('ERPMarketingOfficer', on_delete=models.SET_NULL, null=True, blank=True, related_name='investors')
     bank_name = models.CharField(max_length=100, blank=True, null=True, default='')
     bank_account = models.CharField(max_length=50, blank=True, null=True, default='')
     bank_branch = models.CharField(max_length=100, blank=True, null=True, default='')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    address = models.TextField(blank=True,null=True,default='')
-    phone_number = models.CharField(max_length=255,blank=True,null=True)
-    email = models.EmailField(max_length=255,blank=True,null=True)
-    nid_number = models.CharField(max_length=255,blank=True,null=True)
-    nominee_details = models.TextField(max_length=255,blank=True,null=True)
-    bank_account_details = models.TextField(blank=True,null=True,default='')
+    address = models.TextField(blank=True, null=True, default='')
+    phone_number = models.CharField(max_length=255, blank=True, null=True)
+    email = models.EmailField(max_length=255, blank=True, null=True)
+    nid_number = models.CharField(max_length=255, blank=True, null=True)
+    nominee_details = models.TextField(max_length=255, blank=True, null=True)
+    bank_account_details = models.TextField(blank=True, null=True, default='')
 
     def __str__(self):
         return f'{self.investor_code} - {self.user.full_name}'
-    
+
+    def save(self, *args, **kwargs):
+        # ── নতুন investor হলে code generate করো ──
+        if not self.investor_code:
+            last = ERPInvestor.objects.order_by('-id').first()
+            if last and last.investor_code:
+                try:
+                    last_num = int(last.investor_code.split('-')[-1])
+                except ValueError:
+                    last_num = 0
+            else:
+                last_num = 0
+            self.investor_code = f'ASH-{str(last_num + 1).zfill(4)}'
+        super().save(*args, **kwargs)
+
 
 class ERPInvestment(models.Model):
     STATUS_CHOICES = [
@@ -1290,40 +1304,56 @@ class ERPInvestment(models.Model):
     ]
 
     id = models.BigAutoField(primary_key=True)
-    investor = models.ForeignKey('ERPInvestor',on_delete=models.CASCADE,related_name='investments')
-    project = models.ForeignKey('Project',on_delete=models.SET_NULL,null=True,blank=True,related_name='investments')
-    invest_amount = models.DecimalField(max_digits=16,decimal_places=2)
+    investor = models.ForeignKey('ERPInvestor', on_delete=models.CASCADE, related_name='investments')
+    project = models.ForeignKey('Project', on_delete=models.SET_NULL, null=True, blank=True, related_name='investments')
+    investment_id = models.CharField(max_length=50, unique=True, blank=True, null=True)
+    invest_amount = models.DecimalField(max_digits=16, decimal_places=2)
     invest_date = models.DateField(default=date.today)
-    maturity_date = models.DateField(blank=True,null=True)
-    monthly_dividend_rate = models.DecimalField(max_digits=5,decimal_places=2,default=0)
-    total_profit_received = models.DecimalField(max_digits=16,decimal_places=2,default=0)
-    agreement_number = models.CharField(max_length=100,blank=True,null=True,default='')
-    status = models.CharField(max_length=20,choices=STATUS_CHOICES,default='active')
-    cancellation_date = models.DateField(blank=True,null=True)
-    cancellation_note = models.TextField(blank=True,null=True,default='')
-    transferred_to_project = models.ForeignKey('Project',on_delete=models.SET_NULL,null=True,blank=True,related_name='transferred_investments')
-    transfer_date = models.DateField(blank=True,null=True)
-    transfer_service_charge = models.DecimalField(max_digits=12,decimal_places=2,default=0)
-    notes = models.TextField(blank=True,null=True,default='')
+    maturity_date = models.DateField(blank=True, null=True)
+    monthly_dividend_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    total_profit_received = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    agreement_number = models.CharField(max_length=100, blank=True, null=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    cancellation_date = models.DateField(blank=True, null=True)
+    cancellation_note = models.TextField(blank=True, null=True, default='')
+    transferred_to_project = models.ForeignKey('Project', on_delete=models.SET_NULL, null=True, blank=True, related_name='transferred_investments')
+    transfer_date = models.DateField(blank=True, null=True)
+    transfer_service_charge = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    notes = models.TextField(blank=True, null=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    investment_id = models.CharField(max_length=50,unique=True,blank=True,null=True)
-    duration = models.CharField(max_length=50,default='12 Months')
-    terms_conditions = models.TextField(blank=True,null=True)
-    partial_return_amount = models.DecimalField(max_digits=15,decimal_places=2,default=0.00)
-    amount_returned = models.DecimalField(max_digits=15,decimal_places=2,default=0.00)
-    dividend_payment_method = models.CharField(max_length=20,choices=PAYMENT_METHODS,default='bank_transfer')
-    partial_return_date = models.DateField(blank=True,null=True)
-    full_return_date = models.DateField(blank=True,null=True)
-    documents = models.FileField(upload_to='investments/docs/',blank=True,null=True)
+    duration = models.CharField(max_length=50, default='12 Months')
+    terms_conditions = models.TextField(blank=True, null=True)
+    partial_return_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
+    amount_returned = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
+    dividend_payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, default='bank_transfer')
+    partial_return_date = models.DateField(blank=True, null=True)
+    full_return_date = models.DateField(blank=True, null=True)
+    documents = models.FileField(upload_to='investments/docs/', blank=True, null=True)
     audit_trail = models.JSONField(default=dict)
+
     @property
     def remaining_investment(self):
         return self.invest_amount - self.amount_returned
 
     def __str__(self):
         return f'{self.investor} - {self.invest_amount}'
-    
+
+    def save(self, *args, **kwargs):
+        # ── নতুন investment হলে ID generate করো ──
+        if not self.investment_id:
+            last = ERPInvestment.objects.order_by('-id').first()
+            if last and last.investment_id:
+                try:
+                    last_num = int(last.investment_id.split('-')[-1])
+                except ValueError:
+                    last_num = 0
+            else:
+                last_num = 0
+            self.investment_id = f'ID-{str(last_num + 1).zfill(4)}'
+        super().save(*args, **kwargs) 
+
+        
 
 class ERPDividend(models.Model):
     STATUS_CHOICES = [
@@ -1467,35 +1497,79 @@ class ERPEmployee(models.Model):
         return f'{self.employee_code} - {self.full_name}'
     
 
+from django.db import models
+from django.utils import timezone
+
+
 class ERPAttendance(models.Model):
     STATUS_CHOICES = [
-        ('present', 'Present'),
-        ('absent', 'Absent'),
-        ('late', 'Late'),
+        ('present',  'Present'),
+        ('absent',   'Absent'),
+        ('late',     'Late'),
         ('half_day', 'Half Day'),
-        ('leave', 'Leave'),
-        ('holiday', 'Holiday'),
+        ('leave',    'Leave'),
+        ('holiday',  'Holiday'),
     ]
 
-    id = models.BigAutoField(primary_key=True)
-    employee = models.ForeignKey(ERPEmployee, on_delete=models.CASCADE, related_name='attendances')
+    id              = models.BigAutoField(primary_key=True)
+    employee        = models.ForeignKey(ERPEmployee, on_delete=models.CASCADE, related_name='attendances')
     attendance_date = models.DateField()
-    check_in = models.DateTimeField(blank=True, null=True)
-    check_out = models.DateTimeField(blank=True, null=True)
-    total_hours = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='present')
-    device_log_id = models.CharField(max_length=100, blank=True, null=True, default='')
-    remarks = models.TextField(blank=True, null=True, default='')
-    marked_by = models.CharField(max_length=100, blank=True, null=True, default='')
-    created_at = models.DateTimeField(auto_now_add=True)
+    check_in        = models.DateTimeField(blank=True, null=True)
+    check_out       = models.DateTimeField(blank=True, null=True)
+    total_hours     = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    status          = models.CharField(max_length=20, choices=STATUS_CHOICES, default='absent')
+    device_log_id   = models.CharField(max_length=100, blank=True, null=True, default='')
+    remarks         = models.TextField(blank=True, null=True, default='')
+    marked_by       = models.CharField(max_length=100, blank=True, null=True, default='')
+    created_at      = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = [['employee', 'attendance_date']]
-        ordering = ['-attendance_date']
+        ordering        = ['-attendance_date']
 
     def __str__(self):
         return f'{self.employee.full_name} - {self.attendance_date}'
 
+
+class ERPAttendanceSummary(models.Model):
+    employee     = models.ForeignKey(ERPEmployee, on_delete=models.CASCADE, related_name='attendance_summaries')
+    month        = models.DateField()
+    total_days   = models.IntegerField(default=0)
+    present_days = models.IntegerField(default=0)
+    absent_days  = models.IntegerField(default=0)
+    late_days    = models.IntegerField(default=0)
+    half_days    = models.IntegerField(default=0)
+    leave_days   = models.IntegerField(default=0)
+    holiday_days = models.IntegerField(default=0)
+    total_hours  = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [['employee', 'month']]
+        ordering        = ['-month']
+
+    def __str__(self):
+        return f'{self.employee.employee_code} - {self.month.strftime("%B %Y")}'
+
+
+class ERPHoliday(models.Model):
+    name         = models.CharField(max_length=200)
+    date         = models.DateField(unique=True)
+    holiday_type = models.CharField(max_length=50, choices=[
+        ('govt',   'Government Holiday'),
+        ('office', 'Office Holiday'),
+        ('other',  'Other'),
+    ], default='govt')
+    description  = models.TextField(blank=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['date']
+
+    def __str__(self):
+        return f'{self.name} - {self.date}'
+        
 
 class ERPPayroll(models.Model):
     STATUS_CHOICES = [

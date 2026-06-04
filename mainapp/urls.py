@@ -192,6 +192,18 @@ from mainapp.views import (
     CommissionSummaryView,
 )
 
+from .views import (
+    ERPCheckInView,
+    ERPCheckOutView,
+    ERPAttendanceListView,
+    ERPAttendanceDetailView,
+    ERPAttendanceCreateView,
+    ERPAttendanceSummaryListView,
+    GenerateMonthlySummaryView,
+    ERPHolidayDetailView,
+    ERPHolidayListCreateView
+)
+
 # =====================================================
 # REAL ESTATE ERP — URL PATTERNS
 # =====================================================
@@ -365,17 +377,24 @@ urlpatterns = [
     # =====================================================
     # 16. INVESTOR
     # =====================================================
-    path('erp-investors/', ERPInvestorListView.as_view(), name='erp-investor-list'),
+    # ── Investor ──────────────────────────────────
+    path('erp-investors/',          ERPInvestorListView.as_view(),   name='erp-investor-list'),
+    path('erp-investors/new/',      ERPInvestorCreateView.as_view(), name='erp-investor-create'),
     path('erp-investors/<int:pk>/', ERPInvestorDetailView.as_view(), name='erp-investor-detail'),
-    path('erp-investors/new/', ERPInvestorCreateView.as_view(), name='erp-investor-create'),
 
-    path('erp-investments/', ERPInvestmentListView.as_view(), name='erp-investment-list'),
+    # ── Investment ────────────────────────────────
+    path('erp-investments/',          ERPInvestmentListView.as_view(),   name='erp-investment-list'),
+    path('erp-investments/new/',      ERPInvestmentCreateView.as_view(), name='erp-investment-create'),
     path('erp-investments/<int:pk>/', ERPInvestmentDetailView.as_view(), name='erp-investment-detail'),
-    path('erp-investments/new/', ERPInvestmentCreateView.as_view(), name='erp-investment-create'),
 
-    path('erp-dividends/', ERPDividendListView.as_view(), name='erp-dividend-list'),
+    # ── Dividend ──────────────────────────────────
+    path('erp-dividends/',          ERPDividendListView.as_view(),   name='erp-dividend-list'),
+    path('erp-dividends/new/',      ERPDividendCreateView.as_view(), name='erp-dividend-create'),
     path('erp-dividends/<int:pk>/', ERPDividendDetailView.as_view(), name='erp-dividend-detail'),
-    path('erp-dividends/new/', ERPDividendCreateView.as_view(), name='erp-dividend-create'),
+
+    # ── Land Power ────────────────────────────────
+    path('erp-land-power/', LandPowerViewSet.as_view({'get': 'list', 'post': 'create'}), name='land-power-list'),
+    path('erp-land-power/<int:pk>/', LandPowerViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='land-power-detail'),
 
     # =====================================================
     # 17. HR — EMPLOYEE, ATTENDANCE, PAYROLL (DONE)
@@ -383,10 +402,6 @@ urlpatterns = [
     path('erp-employees/', ERPEmployeeListView.as_view(), name='erp-employee-list'),
     path('erp-employees/new/', ERPEmployeeCreateView.as_view(), name='erp-employee-create'),  # ✅ আগে
     path('erp-employees/<int:pk>/', ERPEmployeeDetailView.as_view(), name='erp-employee-detail'),
-
-    path('erp-attendance/', ERPAttendanceListView.as_view(), name='erp-attendance-list'),
-    path('erp-attendance/new/', ERPAttendanceCreateView.as_view(), name='erp-attendance-create'),  # ✅ আগে
-    path('erp-attendance/<int:pk>/', ERPAttendanceDetailView.as_view(), name='erp-attendance-detail'),
 
     path('erp-payroll/', ERPPayrollListView.as_view(), name='erp-payroll-list'),
     path('erp-payroll/new/', ERPPayrollCreateView.as_view(), name='erp-payroll-create'),  # ✅ আগে
@@ -491,4 +506,22 @@ urlpatterns += [
     path('commissions/<int:pk>/mark-paid/',     CommissionMarkPaidView.as_view(),  name='commission-mark-paid'),
     path('commission-dashboard/', commission_dashboard, name='commission-dashboard'),
     path('commission-dashboard/officer/<int:officer_id>/', officer_commission_detail, name='officer-commission-detail'),
+]
+
+urlpatterns += [
+    # ── Auto check-in / check-out ─────────────────────
+    path('attendance/check-in/',  ERPCheckInView.as_view(),  name='attendance-checkin'),
+    path('attendance/check-out/', ERPCheckOutView.as_view(), name='attendance-checkout'),
+
+    # ── Manual CRUD ───────────────────────────────────
+    path('attendance/',          ERPAttendanceListView.as_view(),   name='attendance-list'),
+    path('attendance/create/',   ERPAttendanceCreateView.as_view(), name='attendance-create'),
+    path('attendance/<int:pk>/', ERPAttendanceDetailView.as_view(), name='attendance-detail'),
+
+    # ── Summary ───────────────────────────────────────
+    path('attendance/summary/',          ERPAttendanceSummaryListView.as_view(),  name='attendance-summary-list'),
+    path('attendance/summary/generate/', GenerateMonthlySummaryView.as_view(),    name='attendance-summary-generate'),
+
+    path('holidays/',          ERPHolidayListCreateView.as_view(), name='holiday-list'),
+    path('holidays/<int:pk>/', ERPHolidayDetailView.as_view(),     name='holiday-detail'),
 ]

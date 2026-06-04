@@ -140,3 +140,19 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
 }
+
+
+
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    # প্রতিদিন রাত ১১:৫৯ তে absent/holiday auto-mark
+    'auto-mark-absent-daily': {
+        'task'    : 'mainapp.tasks.auto_mark_absent',
+        'schedule': crontab(hour=23, minute=59),
+    },
+    # প্রতি মাসের ১ তারিখ সকাল ১টায় summary generate
+    'generate-monthly-summary': {
+        'task'    : 'mainapp.tasks.generate_monthly_summary',
+        'schedule': crontab(hour=1, minute=0, day_of_month=1),
+    },
+}
