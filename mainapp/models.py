@@ -1342,7 +1342,11 @@ class ERPInvestment(models.Model):
     def save(self, *args, **kwargs):
         if not self.investment_id:
             with transaction.atomic():
-                last = ERPInvestment.objects.select_for_update().order_by('-id').first()
+                # id দিয়ে না, investment_id দিয়ে sort করো
+                last = ERPInvestment.objects.select_for_update().filter(
+                    investment_id__isnull=False
+                ).order_by('-investment_id').first()
+                
                 if last and last.investment_id:
                     try:
                         last_num = int(last.investment_id.split('-')[-1])
@@ -1351,7 +1355,7 @@ class ERPInvestment(models.Model):
                 else:
                     last_num = 0
                 self.investment_id = f'ID-{str(last_num + 1).zfill(4)}'
-        super().save(*args, **kwargs) 
+        super().save(*args, **kwargs)
 
         
 
@@ -1381,6 +1385,8 @@ class ERPDividend(models.Model):
 
     def __str__(self):
         return f'Dividend - {self.investor.investor_code} - {self.month}/{self.year}'
+
+
 
 class LandPowerAssignment(models.Model):
     TRANSFER_STATUS = [
