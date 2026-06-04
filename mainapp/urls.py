@@ -378,19 +378,20 @@ urlpatterns = [
     # 16. INVESTOR
     # =====================================================
     # ── Investor ──────────────────────────────────
-    path('erp-investors/',          ERPInvestorListView.as_view(),   name='erp-investor-list'),
     path('erp-investors/new/',      ERPInvestorCreateView.as_view(), name='erp-investor-create'),
+    path('erp-investors/',          ERPInvestorListView.as_view(),   name='erp-investor-list'),
     path('erp-investors/<int:pk>/', ERPInvestorDetailView.as_view(), name='erp-investor-detail'),
 
     # ── Investment ────────────────────────────────
-    path('erp-investments/',          ERPInvestmentListView.as_view(),   name='erp-investment-list'),
     path('erp-investments/new/',      ERPInvestmentCreateView.as_view(), name='erp-investment-create'),
+    path('erp-investments/',          ERPInvestmentListView.as_view(),   name='erp-investment-list'),
     path('erp-investments/<int:pk>/', ERPInvestmentDetailView.as_view(), name='erp-investment-detail'),
 
     # ── Dividend ──────────────────────────────────
-    path('erp-dividends/',          ERPDividendListView.as_view(),   name='erp-dividend-list'),
     path('erp-dividends/new/',      ERPDividendCreateView.as_view(), name='erp-dividend-create'),
+    path('erp-dividends/',          ERPDividendListView.as_view(),   name='erp-dividend-list'),
     path('erp-dividends/<int:pk>/', ERPDividendDetailView.as_view(), name='erp-dividend-detail'),
+    
 
     # ── Land Power ────────────────────────────────
     path('erp-land-power/', LandPowerViewSet.as_view({'get': 'list', 'post': 'create'}), name='land-power-list'),
@@ -406,6 +407,9 @@ urlpatterns = [
     path('erp-payroll/', ERPPayrollListView.as_view(), name='erp-payroll-list'),
     path('erp-payroll/new/', ERPPayrollCreateView.as_view(), name='erp-payroll-create'),  # ✅ আগে
     path('erp-payroll/<int:pk>/', ERPPayrollDetailView.as_view(), name='erp-payroll-detail'),
+
+
+    
 
     # =====================================================
     # 18. OFFICER REQUEST (TA/DA/Mobile/Commission withdrawal)
