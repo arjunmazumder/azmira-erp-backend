@@ -1290,12 +1290,15 @@ class ERPVoucherRejectView(generics.UpdateAPIView):
 # =====================================================
 # 11. PROJECT VISIT VIEWS
 # =====================================================
+from django.utils import timezone
+from rest_framework import generics, status
+from rest_framework.response import Response
+
 
 class ERPProjectVisitListView(generics.ListAPIView):
     serializer_class = ERPProjectVisitSerializer
 
     def get_queryset(self):
-        # ✅ select_related
         qs = ERPProjectVisit.objects.select_related(
             'project',
             'customer',
@@ -1304,19 +1307,15 @@ class ERPProjectVisitListView(generics.ListAPIView):
             'confirmed_by'
         ).all()
 
-        project_id = self.request.query_params.get('project')
-        officer_id = self.request.query_params.get('officer')
-        status     = self.request.query_params.get('status')
-        lead_id    = self.request.query_params.get('lead')
+        project_id   = self.request.query_params.get('project')
+        officer_id   = self.request.query_params.get('officer')
+        visit_status = self.request.query_params.get('status')  # ✅ নাম বদলানো
+        lead_id      = self.request.query_params.get('lead')
 
-        if project_id:
-            qs = qs.filter(project_id=project_id)
-        if officer_id:
-            qs = qs.filter(marketing_officer_id=officer_id)
-        if status:
-            qs = qs.filter(status=status)
-        if lead_id:
-            qs = qs.filter(lead_id=lead_id)
+        if project_id:   qs = qs.filter(project_id=project_id)
+        if officer_id:   qs = qs.filter(marketing_officer_id=officer_id)
+        if visit_status: qs = qs.filter(status=visit_status)    # ✅
+        if lead_id:      qs = qs.filter(lead_id=lead_id)
 
         return qs
 
@@ -1331,17 +1330,13 @@ class ERPProjectVisitDetailView(generics.RetrieveUpdateDestroyAPIView):
         )
 
     def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(
-            instance, data=request.data, partial=True
-        )
+        instance   = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
 
-        new_status = request.data.get('status')
-
-        # ✅ confirmed হলে confirmed_by + confirmed_at auto set
-        # double save() নেই — serializer.save() এ একবারেই হচ্ছে
+        new_status  = request.data.get('status')
         save_kwargs = {}
+
         if new_status == 'confirmed' and not instance.confirmed_by_id:
             confirmed_by_id = request.data.get('confirmed_by')
             if not confirmed_by_id:
@@ -1350,14 +1345,13 @@ class ERPProjectVisitDetailView(generics.RetrieveUpdateDestroyAPIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             save_kwargs['confirmed_by_id'] = confirmed_by_id
-            save_kwargs['confirmed_at']    = datetime.now()
+            save_kwargs['confirmed_at']    = timezone.now()     # ✅ datetime.now() → timezone.now()
 
         visit = serializer.save(**save_kwargs)
 
-        # ✅ completed হলে Lead status → visited auto update
         if new_status == 'completed' and visit.lead:
-            visit.lead.status = 'visited'
-            visit.lead.last_contacted = datetime.now()
+            visit.lead.status         = 'visited'
+            visit.lead.last_contacted = timezone.now()          # ✅
             visit.lead.save()
 
         return Response(
@@ -1365,7 +1359,6 @@ class ERPProjectVisitDetailView(generics.RetrieveUpdateDestroyAPIView):
             status=status.HTTP_200_OK
         )
 
-    # ✅ completed visit delete করা যাবে না
     def destroy(self, request, *args, **kwargs):
         visit = self.get_object()
         if visit.status == 'completed':
@@ -1377,15 +1370,7 @@ class ERPProjectVisitDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ERPProjectVisitCreateView(generics.CreateAPIView):
-    serializer_class = ERPProjectVisitSerializer
-
-    def get_queryset(self):
-        return ERPProjectVisit.objects.select_related(
-            'project', 'customer', 'lead',
-            'marketing_officer__user', 'confirmed_by'
-        )
-    
-
+    serializer_class = ERPProjectVisitSerializer 
 
 # =====================================================
 # 12. MARKETING OFFICER VIEWS
@@ -1883,21 +1868,28 @@ def officer_commission_detail(request, officer_id):
 # =====================================================
 # 15. LOAN VIEWS
 # =====================================================
+from decimal import Decimal
+from django.db import transaction
+from rest_framework import generics, status
+from rest_framework.response import Response
+
+from decimal import Decimal
+from django.db import transaction
+from rest_framework import generics, status
+from rest_framework.response import Response
+
 
 class ERPLoanListView(generics.ListAPIView):
     serializer_class = ERPLoanSerializer
 
     def get_queryset(self):
-        # ✅ select_related
-        qs = ERPLoan.objects.select_related('user', 'approved_by').all()
+        qs = ERPLoan.objects.select_related('employee__user', 'approved_by').all()  # ✅ employee__user
 
-        user_id = self.request.query_params.get('user')
-        status  = self.request.query_params.get('status')
+        employee_id = self.request.query_params.get('employee')
+        loan_status = self.request.query_params.get('status')
 
-        if user_id:
-            qs = qs.filter(user_id=user_id)
-        if status:
-            qs = qs.filter(status=status)
+        if employee_id: qs = qs.filter(employee_id=employee_id)
+        if loan_status: qs = qs.filter(status=loan_status)
 
         return qs
 
@@ -1906,9 +1898,8 @@ class ERPLoanDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ERPLoanSerializer
 
     def get_queryset(self):
-        return ERPLoan.objects.select_related('user', 'approved_by')
+        return ERPLoan.objects.select_related('employee__user', 'approved_by')
 
-    # ✅ paid loan delete করা যাবে না
     def destroy(self, request, *args, **kwargs):
         loan = self.get_object()
         if loan.status == 'paid':
@@ -1922,23 +1913,22 @@ class ERPLoanDetailView(generics.RetrieveUpdateDestroyAPIView):
 class ERPLoanCreateView(generics.CreateAPIView):
     serializer_class = ERPLoanSerializer
 
-    def get_queryset(self):
-        return ERPLoan.objects.select_related('user', 'approved_by')
+    def get_queryset(self):                                                          # ✅ যোগ করা হয়েছে
+        return ERPLoan.objects.select_related('employee__user', 'approved_by')
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # ✅ transaction.atomic — loan আর wallet একসাথে, একটা fail হলে দুটোই rollback
         try:
             with transaction.atomic():
-                loan = serializer.save()
-                wallet = ERPWallet.objects.filter(user_id=loan.user_id).first()
+                loan   = serializer.save()
+                wallet = ERPWallet.objects.filter(user=loan.employee.user).first()
                 if wallet:
                     wallet.loan_balance += loan.loan_amount
                     wallet.save()
                 else:
-                    raise ValueError('Wallet not found for this user.')
+                    raise ValueError('Wallet not found for this employee.')
         except ValueError as e:
             return Response(
                 {'error': str(e)},
@@ -1951,13 +1941,12 @@ class ERPLoanCreateView(generics.CreateAPIView):
         )
 
 
-
 class ERPLoanRepaymentView(generics.UpdateAPIView):
-    serializer_class = ERPLoanSerializer
+    serializer_class  = ERPLoanSerializer
     http_method_names = ['patch']
 
     def get_queryset(self):
-        return ERPLoan.objects.select_related('user', 'approved_by')
+        return ERPLoan.objects.select_related('employee__user', 'approved_by')
 
     def patch(self, request, *args, **kwargs):
         loan = self.get_object()
@@ -1975,7 +1964,13 @@ class ERPLoanRepaymentView(generics.UpdateAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        repay_amount = Decimal(str(repay_amount))
+        try:
+            repay_amount = Decimal(str(repay_amount))
+        except Exception:
+            return Response(
+                {'error': 'repay_amount must be a valid number.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         if repay_amount <= 0:
             return Response(
@@ -1989,12 +1984,11 @@ class ERPLoanRepaymentView(generics.UpdateAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # ✅ atomic — loan আর wallet একসাথে update
         with transaction.atomic():
             loan.remaining_amount -= repay_amount
-            loan.save()  # save() এ status auto-update হবে
+            loan.save()
 
-            wallet = ERPWallet.objects.filter(user_id=loan.user_id).first()
+            wallet = ERPWallet.objects.filter(user=loan.employee.user).first()
             if wallet:
                 wallet.loan_balance -= repay_amount
                 wallet.save()

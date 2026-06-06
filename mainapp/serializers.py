@@ -470,17 +470,16 @@ class ERPVoucherSerializer(serializers.ModelSerializer):
 
 # ===== 11. PROJECT VISIT =====
 
-class ERPProjectVisitSerializer(serializers.ModelSerializer):
-    project_name = serializers.SerializerMethodField()
-    officer_name = serializers.SerializerMethodField()
 
-    # ✅ null check সহ
-    customer_name = serializers.SerializerMethodField()
+class ERPProjectVisitSerializer(serializers.ModelSerializer):
+    project_name      = serializers.SerializerMethodField()
+    officer_name      = serializers.SerializerMethodField()
+    customer_name     = serializers.SerializerMethodField()
     confirmed_by_name = serializers.SerializerMethodField()
-    status_display = serializers.SerializerMethodField()
+    status_display    = serializers.SerializerMethodField()
 
     class Meta:
-        model = ERPProjectVisit
+        model  = ERPProjectVisit
         fields = '__all__'
 
     def get_project_name(self, obj):
@@ -499,17 +498,17 @@ class ERPProjectVisitSerializer(serializers.ModelSerializer):
         return obj.get_status_display()
 
     def validate(self, data):
-        # ✅ completed/no_show হলে outcome দিতে হবে
         new_status = data.get('status', getattr(self.instance, 'status', None))
-        outcome = data.get('outcome', getattr(self.instance, 'outcome', ''))
+        outcome    = data.get('outcome', getattr(self.instance, 'outcome', ''))
         if new_status in ['completed', 'no_show'] and not outcome:
             raise serializers.ValidationError(
                 'Outcome is required when status is completed or no_show.'
             )
         return data
-
+    
 
 # ===== 12. MARKETING OFFICER =====
+
 
 class ERPMarketingOfficerSerializer(serializers.ModelSerializer):
     user_name = serializers.ReadOnlyField(source='user.full_name')
@@ -517,14 +516,16 @@ class ERPMarketingOfficerSerializer(serializers.ModelSerializer):
     user_email = serializers.ReadOnlyField(source='user.email')
     user_image = serializers.ImageField(source='user.image', read_only=True)
     rank_display = serializers.SerializerMethodField()
-    upline_name = serializers.SerializerMethodField()
-
+   
     class Meta:
         model = ERPMarketingOfficer
         fields = '__all__'
 
-    def get_rank_display(self, obj): return obj.get_rank_display()
-    def get_upline_name(self, obj): return obj.upline.user.full_name if obj.upline else None
+    def get_rank_display(self, obj): 
+        return obj.get_rank_display()
+    
+
+
 
 
 # ===== 13. WALLET =====
@@ -574,18 +575,18 @@ class ERPCommissionSerializer(serializers.ModelSerializer):
 
 # ===== 15. LOAN =====
 
+
 class ERPLoanSerializer(serializers.ModelSerializer):
-    # ✅ null check সহ
-    user_name = serializers.SerializerMethodField()
+    employee_name    = serializers.SerializerMethodField()  # ✅ user_name → employee_name
     approved_by_name = serializers.SerializerMethodField()
-    status_display = serializers.SerializerMethodField()
+    status_display   = serializers.SerializerMethodField()
 
     class Meta:
-        model = ERPLoan
+        model  = ERPLoan
         fields = '__all__'
 
-    def get_user_name(self, obj):
-        return obj.user.full_name if obj.user else None
+    def get_employee_name(self, obj):                       # ✅
+        return obj.employee.full_name if obj.employee else None
 
     def get_approved_by_name(self, obj):
         return obj.approved_by.full_name if obj.approved_by else None
@@ -594,15 +595,14 @@ class ERPLoanSerializer(serializers.ModelSerializer):
         return obj.get_status_display()
 
     def validate(self, data):
-        # ✅ remaining_amount loan_amount এর চেয়ে বেশি হতে পারবে না
-        loan_amount = data.get('loan_amount', getattr(self.instance, 'loan_amount', 0))
-        remaining = data.get('remaining_amount', getattr(self.instance, 'remaining_amount', 0))
-        if remaining > loan_amount:
+        loan_amount      = data.get('loan_amount',      getattr(self.instance, 'loan_amount',      0))
+        remaining_amount = data.get('remaining_amount', getattr(self.instance, 'remaining_amount', 0))
+        if remaining_amount > loan_amount:
             raise serializers.ValidationError(
                 'Remaining amount cannot exceed loan amount.'
             )
         return data
-
+    
 
 # ===== 16. INVESTOR =====
 

@@ -956,20 +956,19 @@ class ERPVoucher(models.Model):
 # =====================================================
 # 11. PROJECT VISIT (DONE)
 # =====================================================
+
 class ERPProjectVisit(models.Model):
     STATUS_CHOICES = [
         ('scheduled', 'Scheduled'),
         ('confirmed', 'Confirmed'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
-        ('no_show', 'No Show'),
+        ('no_show',   'No Show'),
     ]
 
-    id = models.BigAutoField(primary_key=True)
-
-    # ✅ CASCADE → PROTECT
+    id      = models.BigAutoField(primary_key=True)
     project = models.ForeignKey(
-        Project, on_delete=models.CASCADE,
+        Project, on_delete=models.PROTECT,          # ✅ CASCADE → PROTECT
         related_name='visits'
     )
     customer = models.ForeignKey(
@@ -980,31 +979,24 @@ class ERPProjectVisit(models.Model):
         ERPLead, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='visits'
     )
-    guest_name = models.CharField(max_length=200, blank=True, null=True, default='')
-    guest_phone = models.CharField(max_length=20, blank=True, null=True, default='')
-    visit_date = models.DateTimeField()
+    guest_name  = models.CharField(max_length=200, blank=True, null=True, default='')
+    guest_phone = models.CharField(max_length=20,  blank=True, null=True, default='')
+    visit_date  = models.DateTimeField()
     marketing_officer = models.ForeignKey(
         'ERPMarketingOfficer', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='arranged_visits'
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='scheduled')
-
-    # ✅ CharField → FK
     confirmed_by = models.ForeignKey(
         'ERPUser', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='confirmed_visits'
     )
-    confirmed_at = models.DateTimeField(blank=True, null=True)
-    outcome = models.TextField(blank=True, null=True, default='')
-
-    # ✅ default=False — visit হওয়ার আগে interested জানার প্রশ্নই নেই
-    interested = models.BooleanField(default=False)
-
-    # ✅ default=False — নতুন visit এ notification যায়নি
+    confirmed_at          = models.DateTimeField(blank=True, null=True)
+    outcome               = models.TextField(blank=True, null=True, default='')
+    interested            = models.BooleanField(default=False)
     notification_sent_24h = models.BooleanField(default=False)
     notification_sent_2h  = models.BooleanField(default=False)
-
-    notes = models.TextField(blank=True, null=True, default='')
+    notes      = models.TextField(blank=True, null=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1037,13 +1029,13 @@ class ERPMarketingOfficer(models.Model):
     officer_code = models.CharField(max_length=50, unique=True)
     rank = models.CharField(max_length=30, choices=RANK_CHOICES, default='officer')
     rank_achieved_at = models.DateTimeField(blank=True, null=True)
-    upline = models.ForeignKey(
-        'self', on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='downline'
-    )
+    # upline = models.ForeignKey(
+    #     'self', on_delete=models.SET_NULL,
+    #     null=True, blank=True, related_name='downline'
+    # )
     joining_date = models.DateField(blank=True, null=True)
     target_sales = models.IntegerField(default=0)
-    commission_rate_lot = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
+    commission_rate_plot = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
     commission_rate_flat = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1198,54 +1190,50 @@ class ERPCommission(models.Model):
 # =====================================================
 # 15. LOAN (DONE)
 # =====================================================
+from datetime import date
+
 
 class ERPLoan(models.Model):
     STATUS_CHOICES = [
-        ('active', 'Active'),
+        ('active',         'Active'),
         ('partially_paid', 'Partially Paid'),
-        ('paid', 'Paid'),
+        ('paid',           'Paid'),
     ]
 
-    id = models.BigAutoField(primary_key=True)
-
-    # ✅ CASCADE → PROTECT — loan থাকলে user delete করতে দেবে না
-    user = models.ForeignKey(
-        ERPUser, on_delete=models.PROTECT,
+    id       = models.BigAutoField(primary_key=True)
+    employee = models.ForeignKey(
+        'ERPEmployee', on_delete=models.PROTECT,
+        null=True,      # ← যোগ করো
+        blank=True,     # ← যোগ করো
         related_name='loans'
     )
-    loan_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    loan_amount      = models.DecimalField(max_digits=12, decimal_places=2)
     remaining_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    loan_date = models.DateField(default=date.today)
-    reason = models.TextField(blank=True, null=True, default='')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
-
-    # ✅ CharField → FK
-    approved_by = models.ForeignKey(
+    loan_date        = models.DateField(default=date.today)
+    reason           = models.TextField(blank=True, null=True, default='')
+    status           = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    approved_by      = models.ForeignKey(
         'ERPUser', on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='approved_loans'
+        null=True, blank=True, related_name='approved_loans'
     )
     approved_at = models.DateTimeField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        # ✅ নতুন loan এ remaining_amount auto set
         if not self.pk:
-            self.remaining_amount = self.loan_amount
-
-        # ✅ status auto-update
+            self.remaining_amount = self.loan_amount  # ✅ নতুন loan এ auto set
         if self.remaining_amount <= 0:
             self.status = 'paid'
         elif self.remaining_amount < self.loan_amount:
             self.status = 'partially_paid'
         else:
             self.status = 'active'
-
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f'Loan - {self.user.full_name} - {self.loan_amount}'
+        return f'Loan - {self.employee.full_name} - {self.loan_amount}'  
+    
 
 
 # =====================================================

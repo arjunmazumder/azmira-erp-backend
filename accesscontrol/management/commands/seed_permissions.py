@@ -74,10 +74,10 @@ ALL_PERMISSIONS = [
     ('project_visit',   'delete', 'Visit delete করা'),
 
     # ── Marketing Officer ─────────────────────────────
-    ('marketing_officer','view',  'Marketing officer দেখা'),
-    ('marketing_officer','create','নতুন officer তৈরি করা'),
-    ('marketing_officer','edit',  'Officer edit করা'),
-    ('marketing_officer','delete','Officer delete করা'),
+    ('marketing_officer', 'view',   'Marketing officer দেখা'),
+    ('marketing_officer', 'create', 'নতুন officer তৈরি করা'),
+    ('marketing_officer', 'edit',   'Officer edit করা'),
+    ('marketing_officer', 'delete', 'Officer delete করা'),
 
     # ── Officer Request (TA/DA) ───────────────────────
     ('officer_request', 'view',   'Officer request দেখা'),
@@ -92,10 +92,10 @@ ALL_PERMISSIONS = [
     ('land_record',     'delete', 'Land record delete করা'),
 
     # ── Land Acquisition ─────────────────────────────
-    ('land_acquisition','view',   'Land acquisition দেখা'),
-    ('land_acquisition','create', 'নতুন acquisition তৈরি করা'),
-    ('land_acquisition','edit',   'Acquisition edit করা'),
-    ('land_acquisition','delete', 'Acquisition delete করা'),
+    ('land_acquisition', 'view',   'Land acquisition দেখা'),
+    ('land_acquisition', 'create', 'নতুন acquisition তৈরি করা'),
+    ('land_acquisition', 'edit',   'Acquisition edit করা'),
+    ('land_acquisition', 'delete', 'Acquisition delete করা'),
 
     # ── Investor ─────────────────────────────────────
     ('investor',        'view',   'Investor দেখা'),
@@ -151,6 +151,12 @@ ALL_PERMISSIONS = [
     ('offer',           'edit',   'Offer edit করা'),
     ('offer',           'delete', 'Offer delete করা'),
 
+    # ── Plot ─────────────────────────────────────────
+    ('plot',            'view',   'Plot দেখা'),
+    ('plot',            'create', 'নতুন Plot তৈরি করা'),
+    ('plot',            'edit',   'Plot edit করা'),
+    ('plot',            'delete', 'Plot delete করা'),
+
     # ── Document ─────────────────────────────────────
     ('document',        'view',   'Document দেখা'),
     ('document',        'create', 'নতুন Document আপলোড করা'),
@@ -190,6 +196,7 @@ DEFAULT_ROLE_PERMISSIONS = [
     # ══════════════════════════════════════════════════
     ('employee', 'project.view',        'all'),
     ('employee', 'property.view',       'all'),
+    ('employee', 'plot.view',           'all'),
     ('employee', 'offer.view',          'all'),
     ('employee', 'attendance.view',     'own'),
     ('employee', 'payroll.view',        'own'),
@@ -202,6 +209,7 @@ DEFAULT_ROLE_PERMISSIONS = [
     # ══════════════════════════════════════════════════
     ('marketing_officer', 'project.view',           'all'),
     ('marketing_officer', 'property.view',          'all'),
+    ('marketing_officer', 'plot.view',              'all'),
     ('marketing_officer', 'customer.view',          'own'),
     ('marketing_officer', 'customer.create',        'own'),
     ('marketing_officer', 'lead.view',              'own'),
@@ -224,35 +232,37 @@ DEFAULT_ROLE_PERMISSIONS = [
     # ══════════════════════════════════════════════════
     # MARKETING MANAGER
     # ══════════════════════════════════════════════════
-    ('marketing_manager', 'project.view',           'all'),
-    ('marketing_manager', 'property.view',          'all'),
-    ('marketing_manager', 'customer.view',          'all'),
-    ('marketing_manager', 'customer.create',        'all'),
-    ('marketing_manager', 'customer.edit',          'all'),
-    ('marketing_manager', 'lead.view',              'all'),
-    ('marketing_manager', 'lead.create',            'all'),
-    ('marketing_manager', 'lead.edit',              'all'),
-    ('marketing_manager', 'lead.delete',            'all'),
-    ('marketing_manager', 'booking.view',           'all'),
-    ('marketing_manager', 'installment.view',       'all'),
-    ('marketing_manager', 'receipt.view',           'all'),
-    ('marketing_manager', 'commission.view',        'all'),
-    ('marketing_manager', 'wallet.view',            'own'),
-    ('marketing_manager', 'project_visit.view',     'all'),
-    ('marketing_manager', 'project_visit.create',   'all'),
-    ('marketing_manager', 'project_visit.edit',     'all'),
-    ('marketing_manager', 'officer_request.view',   'all'),
-    ('marketing_manager', 'officer_request.create', 'own'),
-    ('marketing_manager', 'officer_request.edit',   'own'),
-    ('marketing_manager', 'document.view',          'all'),
-    ('marketing_manager', 'offer.view',             'all'),
-    ('marketing_manager', 'marketing_officer.view', 'all'),
+    ('marketing_manager', 'project.view',             'all'),
+    ('marketing_manager', 'property.view',            'all'),
+    ('marketing_manager', 'plot.view',                'all'),
+    ('marketing_manager', 'customer.view',            'all'),
+    ('marketing_manager', 'customer.create',          'all'),
+    ('marketing_manager', 'customer.edit',            'all'),
+    ('marketing_manager', 'lead.view',                'all'),
+    ('marketing_manager', 'lead.create',              'all'),
+    ('marketing_manager', 'lead.edit',                'all'),
+    ('marketing_manager', 'lead.delete',              'all'),
+    ('marketing_manager', 'booking.view',             'all'),
+    ('marketing_manager', 'installment.view',         'all'),
+    ('marketing_manager', 'receipt.view',             'all'),
+    ('marketing_manager', 'commission.view',          'all'),
+    ('marketing_manager', 'wallet.view',              'own'),
+    ('marketing_manager', 'project_visit.view',       'all'),
+    ('marketing_manager', 'project_visit.create',     'all'),
+    ('marketing_manager', 'project_visit.edit',       'all'),
+    ('marketing_manager', 'officer_request.view',     'all'),
+    ('marketing_manager', 'officer_request.create',   'own'),
+    ('marketing_manager', 'officer_request.edit',     'own'),
+    ('marketing_manager', 'document.view',            'all'),
+    ('marketing_manager', 'offer.view',               'all'),
+    ('marketing_manager', 'marketing_officer.view',   'all'),
 
     # ══════════════════════════════════════════════════
     # CUSTOMER
     # ══════════════════════════════════════════════════
     ('customer', 'project.view',      'all'),
     ('customer', 'property.view',     'all'),
+    ('customer', 'plot.view',         'all'),
     ('customer', 'booking.view',      'own'),
     ('customer', 'installment.view',  'own'),
     ('customer', 'receipt.view',      'own'),
@@ -266,6 +276,7 @@ DEFAULT_ROLE_PERMISSIONS = [
     # ══════════════════════════════════════════════════
     ('investor', 'project.view',     'all'),
     ('investor', 'property.view',    'all'),
+    ('investor', 'plot.view',        'all'),
     ('investor', 'investment.view',  'own'),
     ('investor', 'dividend.view',    'own'),
     ('investor', 'wallet.view',      'own'),
@@ -314,7 +325,11 @@ class Command(BaseCommand):
 
         for role, codename, scope in DEFAULT_ROLE_PERMISSIONS:
             try:
-                perm = ERPPermission.objects.get(codename=codename)
+                module, action = codename.split('.')          # ✅ fix
+                perm = ERPPermission.objects.get(
+                    module=module,
+                    action=action
+                )
                 _, created = ERPRolePermission.objects.get_or_create(
                     role=role,
                     permission=perm,
@@ -324,6 +339,8 @@ class Command(BaseCommand):
                     created_role_perms += 1
             except ERPPermission.DoesNotExist:
                 errors.append(f'❌ Permission পাওয়া যায়নি: {codename}')
+            except ValueError:
+                errors.append(f'❌ Invalid codename format: {codename}')
 
         total_role_perms = ERPRolePermission.objects.count()
         self.stdout.write(f'  ✅ {created_role_perms} নতুন role permission তৈরি (মোট: {total_role_perms})\n')

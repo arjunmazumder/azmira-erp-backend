@@ -596,7 +596,7 @@ class ERPProjectVisitAdmin(admin.ModelAdmin):
 
 @admin.register(ERPMarketingOfficer)
 class ERPMarketingOfficerAdmin(admin.ModelAdmin):
-    list_display = ('id', 'officer_code', 'user', 'rank', 'upline', 'joining_date', 'commission_rate_lot', 'commission_rate_flat', 'is_active')
+    list_display = ('id', 'officer_code', 'user', 'rank', 'joining_date', 'commission_rate_plot', 'commission_rate_flat', 'is_active')
     list_filter = ('rank', 'is_active')
     search_fields = ('officer_code', 'user__full_name', 'user__phone', 'user__email')
     ordering = ('-created_at',)
@@ -605,11 +605,8 @@ class ERPMarketingOfficerAdmin(admin.ModelAdmin):
         ('Officer Info', {
             'fields': ('user', 'officer_code', 'rank', 'rank_achieved_at', 'joining_date', 'is_active')
         }),
-        ('Hierarchy', {
-            'fields': ('upline',)
-        }),
         ('Commission', {
-            'fields': ('commission_rate_lot', 'commission_rate_flat', 'target_sales')
+            'fields': ('commission_rate_plot', 'commission_rate_flat', 'target_sales')
         }),
         ('Audit', {
             'fields': ('created_at', 'updated_at'),
@@ -657,38 +654,6 @@ class ERPWalletTransactionAdmin(admin.ModelAdmin):
 # =====================================================
 # 14. COMMISSION
 # =====================================================
-
-# @admin.register(ERPCommissionRule)
-# class ERPCommissionRuleAdmin(admin.ModelAdmin):
-#     list_display = ('id', 'rule_name', 'project', 'generation', 'percentage', 'is_active', 'effective_from', 'effective_to')
-#     list_filter = ('is_active', 'project', 'generation')
-#     search_fields = ('rule_name',)
-#     ordering = ('generation',)
-#     readonly_fields = ('created_at',)
-
-
-# @admin.register(ERPCommission)
-# class ERPCommissionAdmin(admin.ModelAdmin):
-#     list_display = ('id', 'marketing_officer', 'booking', 'generation', 'commission_rate', 'commission_amount', 'is_cash_payment', 'status', 'wallet_hit')
-#     list_filter = ('status', 'generation', 'is_cash_payment', 'wallet_hit')
-#     search_fields = ('marketing_officer__officer_code', 'marketing_officer__user__full_name', 'booking__booking_code')
-#     ordering = ('-created_at',)
-#     readonly_fields = ('created_at', 'updated_at', 'wallet_hit_at')
-#     fieldsets = (
-#         ('Commission Info', {
-#             'fields': ('marketing_officer', 'booking', 'receipt', 'generation')
-#         }),
-#         ('Amount', {
-#             'fields': ('commission_rate', 'base_amount', 'commission_amount', 'payment_mode', 'is_cash_payment')
-#         }),
-#         ('Status', {
-#             'fields': ('status', 'wallet_hit', 'wallet_hit_at')
-#         }),
-#         ('Audit', {
-#             'fields': ('created_at', 'updated_at'),
-#             'classes': ('collapse',)
-#         }),
-#     )
 
 from django.contrib import admin
 from .models import ERPCommission, ERPCommissionRule
@@ -746,17 +711,16 @@ class ERPCommissionAdmin(admin.ModelAdmin):
 # =====================================================
 # 15. LOAN
 # =====================================================
-
 @admin.register(ERPLoan)
 class ERPLoanAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'loan_amount', 'remaining_amount', 'loan_date', 'status')
+    list_display = ('id', 'employee', 'loan_amount', 'remaining_amount', 'loan_date', 'status')
     list_filter = ('status',)
-    search_fields = ('user__full_name', 'user__username', 'reason')
+    search_fields = ('employee__user__full_name', 'employee__employee_code', 'reason')
     ordering = ('-created_at',)
     readonly_fields = ('created_at', 'updated_at', 'approved_at')
     fieldsets = (
         ('Loan Info', {
-            'fields': ('user', 'loan_amount', 'remaining_amount', 'loan_date', 'reason', 'status')
+            'fields': ('employee', 'loan_amount', 'remaining_amount', 'loan_date', 'reason', 'status')
         }),
         ('Approval', {
             'fields': ('approved_by', 'approved_at')
@@ -767,7 +731,7 @@ class ERPLoanAdmin(admin.ModelAdmin):
         }),
     )
 
-
+    
 # =====================================================
 # 16. INVESTOR
 # =====================================================
