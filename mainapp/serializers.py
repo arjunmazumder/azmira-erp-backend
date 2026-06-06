@@ -577,7 +577,10 @@ class ERPCommissionSerializer(serializers.ModelSerializer):
 
 
 class ERPLoanSerializer(serializers.ModelSerializer):
-    employee_name    = serializers.SerializerMethodField()  # ✅ user_name → employee_name
+    employee = serializers.PrimaryKeyRelatedField(
+        queryset=ERPEmployee.objects.all(),
+        required=True  # ✅ এটা নিশ্চিত করো
+    )
     approved_by_name = serializers.SerializerMethodField()
     status_display   = serializers.SerializerMethodField()
 

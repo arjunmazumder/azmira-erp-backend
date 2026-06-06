@@ -1922,13 +1922,19 @@ class ERPLoanCreateView(generics.CreateAPIView):
 
         try:
             with transaction.atomic():
-                loan   = serializer.save()
+                loan = serializer.save()
+
+                # ✅ employee None কিনা আগে check করো
+                if not loan.employee:
+                    raise ValueError('Employee is required to create a loan.')
+
                 wallet = ERPWallet.objects.filter(user=loan.employee.user).first()
                 if wallet:
                     wallet.loan_balance += loan.loan_amount
                     wallet.save()
                 else:
                     raise ValueError('Wallet not found for this employee.')
+
         except ValueError as e:
             return Response(
                 {'error': str(e)},
@@ -1939,6 +1945,7 @@ class ERPLoanCreateView(generics.CreateAPIView):
             self.get_serializer(loan).data,
             status=status.HTTP_201_CREATED
         )
+
 
 
 class ERPLoanRepaymentView(generics.UpdateAPIView):
