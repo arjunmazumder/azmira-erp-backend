@@ -1972,7 +1972,7 @@ class ERPLandAcquisition(models.Model):
 #25                COMMISSION TYPE MODEL
 #=============================================================
 
-DECIMAL_FIELD_KWARGS = dict(max_digits=12, decimal_places=2, default=0)
+DECIMAL_FIELD_KWARGS = dict(max_digits=12, decimal_places=6, default=0)
 class Percentage(models.Model):
     PAYMENT_TYPES = [
         ('booking', 'Booking Money'),

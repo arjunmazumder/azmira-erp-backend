@@ -1173,20 +1173,21 @@ class PercentageSerializer(serializers.ModelSerializer):
         source='get_transaction_type_display',
         read_only=True,
     )
+    gen_0 = serializers.DecimalField(max_digits=12, decimal_places=6, coerce_to_string=False)
+    gen_1 = serializers.DecimalField(max_digits=12, decimal_places=6, coerce_to_string=False)
+    gen_2 = serializers.DecimalField(max_digits=12, decimal_places=6, coerce_to_string=False)
+    gen_3 = serializers.DecimalField(max_digits=12, decimal_places=6, coerce_to_string=False)
+    gen_4 = serializers.DecimalField(max_digits=12, decimal_places=6, coerce_to_string=False)
+    gen_5 = serializers.DecimalField(max_digits=12, decimal_places=6, coerce_to_string=False)
+    gen_6 = serializers.DecimalField(max_digits=12, decimal_places=6, coerce_to_string=False)
+    gen_7 = serializers.DecimalField(max_digits=12, decimal_places=6, coerce_to_string=False)
 
     class Meta:
-        model = Percentage  # ← এটা UtilityPayment ছিল, Percentage করো
+        model = Percentage
         fields = [
             'id',
             'transaction_type',
             'transaction_type_display',
-            'gen_0',
-            'gen_1',
-            'gen_2',
-            'gen_3',
-            'gen_4',
-            'gen_5',
-            'gen_6',
-            'gen_7',
+            'gen_0', 'gen_1', 'gen_2', 'gen_3',
+            'gen_4', 'gen_5', 'gen_6', 'gen_7',
         ]
-
