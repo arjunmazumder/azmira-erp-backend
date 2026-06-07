@@ -99,3 +99,91 @@ def generate_monthly_summary(year: int = None, month: int = None):
         )
 
     return f'Summary done: {month_start.strftime("%B %Y")}'
+
+
+
+
+from celery import shared_task
+from django.utils import timezone
+from datetime import date, timedelta
+from .models import ERPInstallmentPlan, ERPSMSLog
+from .utils.sms import send_sms
+
+@shared_task
+def send_installment_reminder_48h():
+    target_date = date.today() + timedelta(days=2)
+
+    installments = ERPInstallmentPlan.objects.filter(
+        due_date=target_date,
+        is_paid=False,
+        sms_sent_48h_flag=False
+    ).select_related('booking__customer__user')  # ✅ user পর্যন্ত select_related
+
+    for installment in installments:
+        customer = installment.booking.customer
+        phone    = customer.user.phone        # ✅ customer.phone → customer.user.phone
+        name     = customer.user.full_name    # ✅ এটাও user থেকে নিতে হবে
+        message  = (
+            f"প্রিয় {name}, "
+            f"আপনার {installment.amount} টাকার কিস্তি "
+            f"{installment.due_date} তারিখে পরিশোধযোগ্য। "
+            f"সময়মতো পরিশোধ করুন। - Azmira"
+        )
+
+        success, error = send_sms(phone, message)
+
+        ERPSMSLog.objects.create(
+            recipient_phone = phone,
+            recipient_name  = name,           # ✅
+            sms_type        = 'installment_reminder',
+            message         = message,
+            status          = 'sent' if success else 'failed',
+            customer        = customer,
+            booking         = installment.booking,
+            sent_at         = timezone.now() if success else None,
+            error_message   = error or ''
+        )
+
+        if success:
+            installment.sms_sent_48h_flag = True
+            installment.save(update_fields=['sms_sent_48h_flag'])
+
+@shared_task
+def send_installment_due_today():
+    """
+    প্রতিদিন চলবে — আজকে due যাদের, তাদের SMS পাঠাবে
+    """
+    today = date.today()
+
+    installments = ERPInstallmentPlan.objects.filter(
+        due_date=today,
+        is_paid=False,
+        sms_sent_due_flag=False        # ✅ শুধু যাদের SMS যায়নি
+    ).select_related('booking__customer')
+
+    for installment in installments:
+        customer = installment.booking.customer
+        phone    = customer.phone
+        message  = (
+            f"প্রিয় {customer.full_name}, "
+            f"আজ আপনার {installment.amount} টাকার কিস্তি পরিশোধের শেষ দিন। "
+            f"যোগাযোগ করুন। - Azmira"
+        )
+
+        success, error = send_sms(phone, message)
+
+        ERPSMSLog.objects.create(
+            recipient_phone = phone,
+            recipient_name  = customer.full_name,
+            sms_type        = 'installment_due',
+            message         = message,
+            status          = 'sent' if success else 'failed',
+            customer        = customer,
+            booking         = installment.booking,
+            sent_at         = timezone.now() if success else None,
+            error_message   = error or ''
+        )
+
+        if success:
+            installment.sms_sent_due_flag = True
+            installment.save(update_fields=['sms_sent_due_flag'])

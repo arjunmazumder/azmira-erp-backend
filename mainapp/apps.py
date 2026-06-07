@@ -8,6 +8,6 @@ class MainappConfig(AppConfig):
     name = 'mainapp'
 
     def ready(self):
-        import mainapp.signals  # noqa — signals register করো
+        import mainapp.signals  
 
 

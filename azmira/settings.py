@@ -36,15 +36,12 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-
     'corsheaders.middleware.CorsMiddleware',
-
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-
     'django.middleware.csrf.CsrfViewMiddleware',
-
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'mainapp.middleware.ERPAutoLogMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -68,23 +65,23 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'azmira.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
 # DATABASES = {
 #     'default': {
-#         'ENGINE': 'django.db.backends.mysql',
-#         'NAME': 'azmira',             # ধাপ ১-এ Workbench-এ যে নাম দিয়েছেন
-#         'USER': 'root',                  # আপনার MySQL ইউজারনেম (ডিফল্ট root)
-#         'PASSWORD': 'Test1234*',     # আপনার MySQL Workbench-এর পাসওয়ার্ড
-#         'HOST': 'localhost',             # লোকালহোস্ট আইপি
-#         'PORT': '3306',                  # MySQL এর ডিফল্ট পোর্ট
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
 #     }
 # }
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'azmira',             # ধাপ ১-এ Workbench-এ যে নাম দিয়েছেন
+        'USER': 'root',                  # আপনার MySQL ইউজারনেম (ডিফল্ট root)
+        'PASSWORD': 'Test1234*',     # আপনার MySQL Workbench-এর পাসওয়ার্ড
+        'HOST': 'localhost',             # লোকালহোস্ট আইপি
+        'PORT': '3306',                  # MySQL এর ডিফল্ট পোর্ট
+    }
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -142,6 +139,10 @@ SIMPLE_JWT = {
 }
 
 
+SSL_WIRELESS_API_TOKEN = 'তোমার_api_token'   # SSL Wireless থেকে পাবে
+SSL_WIRELESS_SENDER_ID = 'তোমার_sender_id'   # যেমন: AZMIRA
+
+
 
 from celery.schedules import crontab
 CELERY_BEAT_SCHEDULE = {
@@ -155,4 +156,16 @@ CELERY_BEAT_SCHEDULE = {
         'task'    : 'mainapp.tasks.generate_monthly_summary',
         'schedule': crontab(hour=1, minute=0, day_of_month=1),
     },
+    
+     # প্রতিদিন সকাল ৯টায় 48h reminder
+    'installment-reminder-48h': {
+        'task':     'mainapp.tasks.send_installment_reminder_48h',
+        'schedule': crontab(hour=9, minute=0),
+    },
+    # প্রতিদিন সকাল ১০টায় due today reminder  
+    'installment-due-today': {
+        'task':     'mainapp.tasks.send_installment_due_today',
+        'schedule': crontab(hour=10, minute=0),
+    },
 }
+

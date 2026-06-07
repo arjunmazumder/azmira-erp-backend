@@ -1,25 +1,30 @@
 from mainapp.hierarch import define_hierarchy
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-from mainapp.models import Transaction
+from mainapp.models import Transaction, Commission, Percentage
 
 
-percentage = {
-    0: 25,
-    1: 7.5,
-    2: 3.75,
-    3: 1.88,
-    4: 0.94,
-    5: 0.47,
-    6: 0.23,
-    7: 0.11 
-}
+def get_percentage(transaction_type):
+    try:
+        p = Percentage.objects.get(transaction_type=transaction_type)
+        return {
+            0: float(p.gen_0),
+            1: float(p.gen_1),
+            2: float(p.gen_2),
+            3: float(p.gen_3),
+            4: float(p.gen_4),
+            5: float(p.gen_5),
+            6: float(p.gen_6),
+            7: float(p.gen_7),
+        }
+    except Percentage.DoesNotExist:
+        print(f"No percentage config found for type: {transaction_type}")
+        return {}
 
 
-
-def commission(amount, referred_by):
+def commission(amount, referred_by, transaction_type):
     print("i am in commission")
-    upline=define_hierarchy(referred_by)
+    upline = define_hierarchy(referred_by)
+    percentage = get_percentage(transaction_type)
+
     com_data = []
     for index, user_id in enumerate(upline):
         percent = percentage.get(index, 0)
@@ -32,7 +37,6 @@ def commission(amount, referred_by):
         })
 
     for item in com_data:
-
         print(
             f"User: {item['user_id']} | "
             f"Level: {item['level']} | "
@@ -42,7 +46,6 @@ def commission(amount, referred_by):
 
     return com_data
 
-from mainapp.models import Transaction,Commission
 
 def create_commission_table(pk):
     print("i am in create commission table")
@@ -53,12 +56,15 @@ def create_commission_table(pk):
         print("Transaction not found")
         return None
 
-    # referred_by না থাকলে commission দরকার নেই
     if not transaction.referred_by:
         print("No referred_by — commission skipped")
         return None
 
-    com_data = commission(transaction.amount, transaction.referred_by.id)
+    com_data = commission(
+        transaction.amount,
+        transaction.referred_by.id,
+        transaction.transaction_type,
+    )
 
     for item in com_data:
         print(item)
@@ -71,3 +77,6 @@ def create_commission_table(pk):
             commission=item["commission"],
             commission_type=transaction.transaction_type
         )
+
+    print(f"Done! {len(com_data)} commission records created.")
+    return com_data

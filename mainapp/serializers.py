@@ -437,7 +437,7 @@ class ERPVoucherSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_customer_name(self, obj):
-        return obj.customer.full_name if obj.customer else None
+        return obj.customer.user.full_name if obj.customer else None
 
     def get_booking_code(self, obj):
         return obj.booking.booking_code if obj.booking else None
@@ -489,7 +489,7 @@ class ERPProjectVisitSerializer(serializers.ModelSerializer):
         return obj.marketing_officer.user.full_name if obj.marketing_officer else None
 
     def get_customer_name(self, obj):
-        return obj.customer.full_name if obj.customer else None
+        return obj.customer.user.full_name if obj.customer else None
 
     def get_confirmed_by_name(self, obj):
         return obj.confirmed_by.full_name if obj.confirmed_by else None
@@ -509,24 +509,84 @@ class ERPProjectVisitSerializer(serializers.ModelSerializer):
 
 # ===== 12. MARKETING OFFICER =====
 
-
 class ERPMarketingOfficerSerializer(serializers.ModelSerializer):
-    user_name = serializers.ReadOnlyField(source='user.full_name')
-    user_phone = serializers.ReadOnlyField(source='user.phone')
-    user_email = serializers.ReadOnlyField(source='user.email')
-    user_image = serializers.ImageField(source='user.image', read_only=True)
+    user         = ERPUserSerializer(read_only=True)   # ✅ read এ nested object
+    user_id      = serializers.PrimaryKeyRelatedField(  # ✅ write এ id নেবে
+        queryset=ERPUser.objects.all(),
+        source='user',
+        write_only=True
+    )
+    user_name    = serializers.ReadOnlyField(source='user.full_name')
+    user_phone   = serializers.ReadOnlyField(source='user.phone')
+    user_email   = serializers.ReadOnlyField(source='user.email')
+    user_image   = serializers.ImageField(source='user.image', read_only=True)
     rank_display = serializers.SerializerMethodField()
-   
+
     class Meta:
-        model = ERPMarketingOfficer
+        model  = ERPMarketingOfficer
         fields = '__all__'
 
-    def get_rank_display(self, obj): 
+    def get_rank_display(self, obj):
         return obj.get_rank_display()
-    
 
+    def create(self, validated_data):
+        from mainapp.models import ERPWallet
 
+        officer = super().create(validated_data)
+        user    = officer.user
 
+        if user:
+            roles = list(user.roles or [])
+
+            if 'marketing_officer' not in roles:
+                roles.append('marketing_officer')
+
+            manager_ranks = ['manager', 'senior_manager', 'agm', 'dgm', 'gm']
+            if officer.rank in manager_ranks:
+                if 'marketing_manager' not in roles:
+                    roles.append('marketing_manager')
+
+            user.roles = list(set(roles))
+            user.save(update_fields=['roles'])
+
+            ERPWallet.objects.get_or_create(
+                user=user,
+                defaults={
+                    'wallet_type':  'marketing',
+                    'balance':      0,
+                    'loan_balance': 0,
+                }
+            )
+
+        return officer
+
+    def update(self, instance, validated_data):
+        officer = super().update(instance, validated_data)
+        user    = officer.user
+
+        if user:
+            roles         = list(user.roles or [])
+            manager_ranks = ['manager', 'senior_manager', 'agm', 'dgm', 'gm']
+
+            if officer.is_active:
+                if 'marketing_officer' not in roles:
+                    roles.append('marketing_officer')
+                if officer.rank in manager_ranks:
+                    if 'marketing_manager' not in roles:
+                        roles.append('marketing_manager')
+                else:
+                    if 'marketing_manager' in roles:
+                        roles.remove('marketing_manager')
+            else:
+                roles = [
+                    r for r in roles
+                    if r not in ('marketing_officer', 'marketing_manager')
+                ]
+
+            user.roles = list(set(roles))
+            user.save(update_fields=['roles'])
+
+        return officer  
 
 # ===== 13. WALLET =====
 
@@ -577,10 +637,7 @@ class ERPCommissionSerializer(serializers.ModelSerializer):
 
 
 class ERPLoanSerializer(serializers.ModelSerializer):
-    employee = serializers.PrimaryKeyRelatedField(
-        queryset=ERPEmployee.objects.all(),
-        required=True  # ✅ এটা নিশ্চিত করো
-    )
+    employee_name    = serializers.SerializerMethodField()  # ✅ user_name → employee_name
     approved_by_name = serializers.SerializerMethodField()
     status_display   = serializers.SerializerMethodField()
 
@@ -753,7 +810,7 @@ from datetime import time
 
 
 # অফিস শুরুর সময় — এখান থেকে late নির্ধারণ হবে
-OFFICE_START_TIME = time(9, 0, 0)   # সকাল ৯টা
+OFFICE_START_TIME = time(10, 0, 0)   # সকাল 10টা
 
 from decimal import Decimal
 
@@ -934,7 +991,7 @@ class ERPSMSLogSerializer(serializers.ModelSerializer):
         return obj.get_status_display()
 
     def get_customer_name(self, obj):
-        return obj.customer.full_name if obj.customer else None
+        return obj.customer.user.full_name if obj.customer else None
 
     def get_booking_code(self, obj):
         return obj.booking.booking_code if obj.booking else None
@@ -959,7 +1016,7 @@ class ERPDocumentSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_customer_name(self, obj):
-        return obj.customer.full_name if obj.customer else None
+        return obj.customer.user.full_name if obj.customer else None
 
     def get_booking_code(self, obj):
         return obj.booking.booking_code if obj.booking else None
@@ -1102,3 +1159,34 @@ class ERPRolePermissionSerializer(serializers.ModelSerializer):
             }
         )
         return obj
+    
+
+
+
+#=======================================================================
+#                COMMISSION TYPE SERIALIZER
+#======================================================================
+from mainapp.models import Percentage
+
+class PercentageSerializer(serializers.ModelSerializer):
+    transaction_type_display = serializers.CharField(
+        source='get_transaction_type_display',
+        read_only=True,
+    )
+
+    class Meta:
+        model = Percentage  # ← এটা UtilityPayment ছিল, Percentage করো
+        fields = [
+            'id',
+            'transaction_type',
+            'transaction_type_display',
+            'gen_0',
+            'gen_1',
+            'gen_2',
+            'gen_3',
+            'gen_4',
+            'gen_5',
+            'gen_6',
+            'gen_7',
+        ]
+

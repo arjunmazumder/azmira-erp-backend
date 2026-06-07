@@ -10,10 +10,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='erprolepermission',
-            name='permission',
-        ),
+        # ✅ RemoveField সরানো হয়েছে — field আগেই নেই
         migrations.AlterUniqueTogether(
             name='erprolepermission',
             unique_together=None,

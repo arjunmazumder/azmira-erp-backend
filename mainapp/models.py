@@ -766,8 +766,8 @@ class ERPInstallmentPlan(models.Model):
     is_paid = models.BooleanField(default=False)
 
     # 🔥 Future-ready SMS tracking (recommended)
-    sms_sent_48h_flag = models.BooleanField(default=True)
-    sms_sent_due_flag = models.BooleanField(default=True)
+    sms_sent_48h_flag = models.BooleanField(default=False)  
+    sms_sent_due_flag = models.BooleanField(default=False)
 
     notes = models.TextField(blank=True, null=True, default='')
 
@@ -887,7 +887,7 @@ class ERPMoneyReceipt(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'Receipt #{self.receipt_number} - {self.customer.full_name}'
+        return f'Receipt #{self.receipt_number} - {self.user.full_name}'
 
 
 # =====================================================
@@ -1011,6 +1011,8 @@ class ERPProjectVisit(models.Model):
 # 12. MARKETING OFFICER (DONE)
 # =====================================================
 
+
+
 class ERPMarketingOfficer(models.Model):
     RANK_CHOICES = [
         ('officer', 'Marketing Officer'),
@@ -1024,22 +1026,18 @@ class ERPMarketingOfficer(models.Model):
         ('gm', 'GM'),
     ]
 
-    id = models.BigAutoField(primary_key=True)
-    user = models.OneToOneField(ERPUser, on_delete=models.CASCADE, related_name='marketing_profile')
-    officer_code = models.CharField(max_length=50, unique=True)
-    rank = models.CharField(max_length=30, choices=RANK_CHOICES, default='officer')
+    id               = models.BigAutoField(primary_key=True)
+    user             = models.OneToOneField(ERPUser, on_delete=models.CASCADE, related_name='marketing_profile')
+    officer_code     = models.CharField(max_length=50, unique=True, blank=True)  # ✅ blank=True
+    rank             = models.CharField(max_length=30, choices=RANK_CHOICES, default='officer')
     rank_achieved_at = models.DateTimeField(blank=True, null=True)
-    # upline = models.ForeignKey(
-    #     'self', on_delete=models.SET_NULL,
-    #     null=True, blank=True, related_name='downline'
-    # )
-    joining_date = models.DateField(blank=True, null=True)
-    target_sales = models.IntegerField(default=0)
+    joining_date         = models.DateField(blank=True, null=True)
+    target_sales         = models.IntegerField(default=0)
     commission_rate_plot = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
     commission_rate_flat = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    is_active            = models.BooleanField(default=True)
+    created_at           = models.DateTimeField(auto_now_add=True)
+    updated_at           = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-created_at']
@@ -1047,7 +1045,18 @@ class ERPMarketingOfficer(models.Model):
     def __str__(self):
         return f'{self.officer_code} - {self.user.full_name} ({self.rank})'
 
+    def save(self, *args, **kwargs):
+        # ✅ officer_code auto generate
+        if not self.officer_code:
+            last = ERPMarketingOfficer.objects.order_by('-id').first()
+            if last and last.officer_code.startswith('OFF-'):
+                last_number = int(last.officer_code.split('-')[1])
+                self.officer_code = f'OFF-{str(last_number + 1).zfill(4)}'
+            else:
+                self.officer_code = 'OFF-0001'
+        super().save(*args, **kwargs)
 
+        
 # =====================================================
 # 13. WALLET (DONE)
 # =====================================================
@@ -1957,4 +1966,46 @@ class ERPLandAcquisition(models.Model):
         super().save(*args, **kwargs)
 
 
+
+#=============================================================
+#25                COMMISSION TYPE MODEL
+#=============================================================
+
+DECIMAL_FIELD_KWARGS = dict(max_digits=12, decimal_places=2, default=0)
+class Percentage(models.Model):
+    PAYMENT_TYPES = [
+        ('booking', 'Booking Money'),
+        ('installment', 'Installment'),
+        ('down_payment', 'Down Payment'),
+        ('investment', 'Investment'),
+        ('registration', 'Registration'),
+        ('land_dev', 'Land Development'),
+        ('parking', 'Parking'),
+        ('transfer', 'Transfer'),
+        ('utility', 'Utility'),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+
+    transaction_type = models.CharField(
+        max_length=20,
+        choices=PAYMENT_TYPES,
+        null=False,
+        blank=False,
+    )
+    gen_0 = models.DecimalField(**DECIMAL_FIELD_KWARGS)
+    gen_1 = models.DecimalField(**DECIMAL_FIELD_KWARGS)
+    gen_2 = models.DecimalField(**DECIMAL_FIELD_KWARGS)
+    gen_3 = models.DecimalField(**DECIMAL_FIELD_KWARGS)
+    gen_4 = models.DecimalField(**DECIMAL_FIELD_KWARGS)
+    gen_5 = models.DecimalField(**DECIMAL_FIELD_KWARGS)
+    gen_6 = models.DecimalField(**DECIMAL_FIELD_KWARGS)
+    gen_7 = models.DecimalField(**DECIMAL_FIELD_KWARGS)
+
+    class Meta:
+        verbose_name = "Percentage"
+        verbose_name_plural = "Percentages"
+
+    def __str__(self):
+        return f"Percentage #{self.pk} ({self.get_transaction_type_display()})"
 

@@ -202,20 +202,32 @@ def marketing_officer_post_save(sender, instance, created, **kwargs):
     manager_ranks = ['manager', 'senior_manager', 'agm', 'dgm', 'gm']
 
     if instance.is_active:
+        # ✅ একসাথে সব role add করো, একবার save করো
+        roles = _get_roles(instance.user)
 
-        _add_role(instance.user, 'marketing_officer')
+        if 'marketing_officer' not in roles:
+            roles.append('marketing_officer')
 
         if instance.rank in manager_ranks:
-            _add_role(instance.user, 'marketing_manager')
+            if 'marketing_manager' not in roles:
+                roles.append('marketing_manager')
         else:
-            _remove_role(instance.user, 'marketing_manager')
+            if 'marketing_manager' in roles:
+                roles.remove('marketing_manager')
+
+        # ✅ একবারই save — loop এড়াতে
+        instance.user.roles = list(set(roles))
+        instance.user.save(update_fields=['roles'])
 
         _get_or_create_wallet_safe(instance.user, 'marketing')
 
     else:
-        _remove_role(instance.user, 'marketing_officer')
-        _remove_role(instance.user, 'marketing_manager')
+        roles = _get_roles(instance.user)
+        roles = [r for r in roles if r not in ('marketing_officer', 'marketing_manager')]
+        instance.user.roles = roles
+        instance.user.save(update_fields=['roles'])
 
+        
 
 @receiver(post_delete, sender='mainapp.ERPMarketingOfficer')
 def marketing_officer_post_delete(sender, instance, **kwargs):
@@ -304,3 +316,98 @@ def on_transaction_deleted(sender, instance, **kwargs):
     """Transaction delete হলেও booking update হবে"""
     if instance.booking_id:
         _refresh_booking_totals(instance.booking)
+
+
+
+
+
+# mainapp/signals.py
+
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+from mainapp.log_utils import create_log
+
+# =====================================================
+# কোন model → কোন module নামে log হবে
+# =====================================================
+MODEL_MODULE_MAP = {
+    'ERPBooking':          ('Booking',     'BOOKING'),
+    'ERPCustomer':         ('Customer',    'CUSTOMER'),
+    'ERPLead':             ('Lead',        'LEAD'),
+    'ERPMoneyReceipt':     ('Payment',     'ACCOUNTS'),
+    'ERPInstallmentPlan':  ('Installment', 'ACCOUNTS'),
+    'ERPVoucher':          ('Voucher',     'ACCOUNTS'),
+    'Property':            ('Property',    'PROPERTY'),
+    'Project':             ('Project',     'PROJECT'),
+    'ERPEmployee':         ('Employee',    'HR'),
+    'ERPPayroll':          ('Payroll',     'HR'),
+    'ERPAttendance':       ('Attendance',  'HR'),
+    'ERPMarketingOfficer': ('Officer',     'MARKETING'),
+    'ERPLead':             ('Lead',        'MARKETING'),
+    'ERPInvestor':         ('Investor',    'INVESTOR'),
+    'ERPInvestment':       ('Investment',  'INVESTOR'),
+    'ERPDividend':         ('Dividend',    'INVESTOR'),
+    'ERPLandAcquisition':  ('Land',        'LAND'),
+    'ERPLandRecord':       ('Land Record', 'LAND'),
+    'ERPWallet':           ('Wallet',      'WALLET'),
+    'ERPWalletTransaction':('Wallet Txn',  'WALLET'),
+    'ERPLoan':             ('Loan',        'HR'),
+    'ERPOfficerRequest':   ('Request',     'MARKETING'),
+    'ERPOffer':            ('Offer',       'MARKETING'),
+    'ERPDocument':         ('Document',    'LEGAL'),
+    'ERPCompanyAsset':     ('Asset',       'LOGISTICS'),
+    'ERPProjectVisit':     ('Visit',       'MARKETING'),
+    'Transaction':         ('Transaction', 'ACCOUNTS'),
+}
+
+# =====================================================
+# যে সব model signal দেবে
+# =====================================================
+from mainapp.models import (
+    ERPBooking, ERPCustomer, ERPLead, ERPMoneyReceipt,
+    ERPInstallmentPlan, ERPVoucher, Property, Project,
+    ERPEmployee, ERPPayroll, ERPAttendance, ERPMarketingOfficer,
+    ERPInvestor, ERPInvestment, ERPDividend, ERPLandAcquisition,
+    ERPLandRecord, ERPWallet, ERPWalletTransaction, ERPLoan,
+    ERPOfficerRequest, ERPOffer, ERPDocument, ERPCompanyAsset,
+    ERPProjectVisit, Transaction,
+)
+
+TRACKED_MODELS = [
+    ERPBooking, ERPCustomer, ERPLead, ERPMoneyReceipt,
+    ERPInstallmentPlan, ERPVoucher, Property, Project,
+    ERPEmployee, ERPPayroll, ERPAttendance, ERPMarketingOfficer,
+    ERPInvestor, ERPInvestment, ERPDividend, ERPLandAcquisition,
+    ERPLandRecord, ERPWallet, ERPWalletTransaction, ERPLoan,
+    ERPOfficerRequest, ERPOffer, ERPDocument, ERPCompanyAsset,
+    ERPProjectVisit, Transaction,
+]
+
+
+def _make_handlers(model):
+    model_name = model.__name__
+    label, module = MODEL_MODULE_MAP.get(model_name, (model_name, 'SYSTEM'))
+
+    @receiver(post_save, sender=model, weak=False)
+    def on_save(sender, instance, created, **kwargs):
+        action = f'{label} {"Created" if created else "Updated"}'
+        create_log(
+            action=action,
+            module=module,
+            description=f'ID: {instance.pk} | {str(instance)[:100]}',
+            log_level='info',
+        )
+
+    @receiver(post_delete, sender=model, weak=False)
+    def on_delete(sender, instance, **kwargs):
+        create_log(
+            action=f'{label} Deleted',
+            module=module,
+            description=f'ID: {instance.pk} | {str(instance)[:100]}',
+            log_level='warning',
+        )
+
+
+# সব model এ handler লাগাও
+for _model in TRACKED_MODELS:
+    _make_handlers(_model)

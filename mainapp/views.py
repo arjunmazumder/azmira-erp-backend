@@ -243,77 +243,66 @@ class ALLRoleChoicesView(APIView):
     
 
 
+from mainapp.log_utils import create_log, get_ip  # ফাইলের উপরে import এ যোগ করো
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def erp_user_login(request):
     username = request.data.get('username')
     password = request.data.get('password')
 
-    # ১. ইউজারনেম এবং পাসওয়ার্ড চেক করা
     if not username or not password:
         return Response({'error': 'Username and password are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # ২. ইউজার অথেন্টিকেশন
     user = authenticate(username=username, password=password)
 
     if user is not None:
         if user.is_active:
-            # ৩. JWT টোকেন তৈরি
             refresh = RefreshToken.for_user(user)
-            
-            # ৪. ইউজারের রোলস লিস্ট নেওয়া
             user_roles = list(user.roles or [])
             access_control = {}
 
-            # 👑 ৫. অ্যাডমিন বা সুপার অ্যাডমিন হলে সরাসরি ফুল পারমিশন বাইপাস করা
             if 'admin' in user_roles or 'super_admin' in user_roles:
-                # আপনার ERPPermission মডেলে থাকা সব মডিউলের লিস্ট
                 all_modules = [
-                    'project', 'plot', 'booking', 'installment', 'receipt', 
-                    'commission', 'wallet', 'lead', 'attendance', 'payroll', 
+                    'project', 'plot', 'booking', 'installment', 'receipt',
+                    'commission', 'wallet', 'lead', 'attendance', 'payroll',
                     'investment', 'dividend', 'officer_request', 'document', 'offer'
                 ]
                 for module in all_modules:
                     access_control[module] = {
-                        "view": True,
-                        "create": True,
-                        "edit": True,
-                        "delete": True,
-                        "scope": "all"  # অ্যাডমিন সব ডেটা দেখবে (All Data)
+                        "view": True, "create": True,
+                        "edit": True, "delete": True, "scope": "all"
                     }
-            
-            # 👥 ৬. সাধারণ ইউজার হলে ক্যাশ/ডাটাবেজ থেকে পারমিশন প্রসেস করা
             else:
-                # সার্কুলার ইমপোর্ট এরর ঠেকাতে ফাংশনের ভেতরে লোকাল ইমপোর্ট
-                # from api.permissions import get_role_permissions 
-                
                 for role in user_roles:
-                    role_perms = get_role_permissions(role)  # ক্যাশ হেল্পার থেকে আসে
-                    
+                    role_perms = get_role_permissions(role)
                     for codename, scope in role_perms.items():
-                        # 'booking.view' -> module='booking', action='view'
                         if '.' in codename:
                             module, action = codename.split('.', 1)
                         else:
                             continue
-                        
-                        # মডিউল অবজেক্ট ইনিশিয়াল করা
                         if module not in access_control:
                             access_control[module] = {
-                                "view": False, "create": False, "edit": False, "delete": False, "scope": "own"
+                                "view": False, "create": False,
+                                "edit": False, "delete": False, "scope": "own"
                             }
-                        
-                        # অ্যাকশন ট্রু করা
                         if action in access_control[module]:
                             access_control[module][action] = True
-                        
-                        # স্কোপ মার্জ করা ('all' প্রায়োরিটি পাবে)
                         if scope == 'all':
                             access_control[module]["scope"] = 'all'
                         elif scope == 'own' and access_control[module]["scope"] != 'all':
                             access_control[module]["scope"] = 'own'
 
-            # ৭. রেসপন্স ডাটা রিটার্ন করা
+            # ✅ Login success log
+            create_log(
+                action='User Login',
+                module='AUTH',
+                user=user,
+                description=f'{user.username} logged in successfully',
+                ip_address=get_ip(request),
+                log_level='info',
+            )
+
             response_data = {
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
@@ -326,10 +315,30 @@ def erp_user_login(request):
                 }
             }
             return Response(response_data, status=status.HTTP_200_OK)
+
         else:
+            # ✅ Disabled account log
+            create_log(
+                action='Login Blocked',
+                module='AUTH',
+                description=f'{username} account is disabled',
+                ip_address=get_ip(request),
+                log_level='warning',
+            )
             return Response({'error': 'Account is disabled'}, status=status.HTTP_403_FORBIDDEN)
+
     else:
+        # ✅ Login failed log
+        create_log(
+            action='Login Failed',
+            module='AUTH',
+            description=f'Invalid credentials for username: {username}',
+            ip_address=get_ip(request),
+            log_level='warning',
+        )
         return Response({'error': 'Invalid username or password'}, status=status.HTTP_401_UNAUTHORIZED)
+
+
 
 
 class ERPUserByRoleView(generics.ListAPIView):
@@ -1377,9 +1386,49 @@ class ERPProjectVisitCreateView(generics.CreateAPIView):
 # =====================================================
 
 class ERPMarketingOfficerListView(generics.ListAPIView):
-    queryset = ERPMarketingOfficer.objects.filter(is_active=True)
     serializer_class = ERPMarketingOfficerSerializer
+    filter_backends  = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields    = [
+        'user__full_name',
+        'user__phone',
+        'user__email',
+        'officer_code',
+        'rank',
+    ]
+    ordering_fields  = ['created_at', 'rank']
+    ordering         = ['-created_at']
 
+    def get_queryset(self):
+        qs = ERPMarketingOfficer.objects.select_related('user').all()  # ✅ সব আসবে
+
+        # ✅ Filter optional করা
+        is_active = self.request.query_params.get('is_active')
+        rank      = self.request.query_params.get('rank')
+
+        if is_active is not None:
+            qs = qs.filter(is_active=is_active.lower() == 'true')
+        if rank:
+            qs = qs.filter(rank=rank)
+
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        queryset   = self.filter_queryset(self.get_queryset())
+        page       = self.paginate_queryset(queryset)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={'request': request})
+            return self.get_paginated_response({
+                'success': True,
+                'data': serializer.data,
+            })
+
+        serializer = self.get_serializer(queryset, many=True, context={'request': request})
+        return Response({
+            'success': True,
+            'count':   queryset.count(),
+            'data':    serializer.data,
+        })
 
 class ERPMarketingOfficerDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ERPMarketingOfficer.objects.all()
@@ -1387,8 +1436,50 @@ class ERPMarketingOfficerDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ERPMarketingOfficerCreateView(generics.CreateAPIView):
-    queryset = ERPMarketingOfficer.objects.all()
-    serializer_class = ERPMarketingOfficerSerializer
+    queryset           = ERPMarketingOfficer.objects.all()
+    serializer_class   = ERPMarketingOfficerSerializer
+    permission_classes = [HasModulePermission]
+    permission_module  = 'marketing'
+
+    def create(self, request, *args, **kwargs):
+        user_id = request.data.get('user')
+
+        if not user_id:
+            return Response({
+                'success': False,
+                'message': 'user_id দেওয়া আবশ্যক।',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if ERPMarketingOfficer.objects.filter(user_id=user_id).exists():
+            return Response({
+                'success': False,
+                'message': 'এই user ইতিমধ্যে Marketing Officer হিসেবে আছে।',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.get_serializer(
+            data=request.data,
+            context={'request': request}
+        )
+
+        if serializer.is_valid():
+            officer = serializer.save()
+
+            # ✅ Fresh data নিয়ে response দাও
+            fresh = ERPMarketingOfficer.objects.select_related('user').get(pk=officer.pk)
+            response_data = ERPMarketingOfficerSerializer(
+                fresh, context={'request': request}
+            ).data
+
+            return Response({
+                'success': True,
+                'message': 'Marketing Officer তৈরি হয়েছে এবং role update হয়েছে।',
+                'data': response_data,
+            }, status=status.HTTP_201_CREATED)
+
+        return Response({
+            'success': False,
+            'errors': serializer.errors,
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ERPMarketingOfficerDownlineView(generics.ListAPIView):
@@ -2248,6 +2339,8 @@ OFFICE_START_TIME = time(9, 0, 0)   # সকাল ৯টা
 # ─────────────────────────────────────────────────────
 # ১. Check-In View
 # ─────────────────────────────────────────────────────
+
+
 class ERPCheckInView(APIView):
     """
     POST /attendance/check-in/
@@ -2655,14 +2748,17 @@ class ERPOfferCreateView(generics.CreateAPIView):
 # =====================================================
 # 21. SMS LOG VIEWS
 # =====================================================
+from django.utils import timezone
+
 
 class ERPSMSLogListView(generics.ListAPIView):
     serializer_class = ERPSMSLogSerializer
 
     def get_queryset(self):
-        # ✅ select_related
         qs = ERPSMSLog.objects.select_related(
-            'customer', 'booking', 'officer__user'
+            'customer__user',    # ✅ customer.user.full_name এর জন্য
+            'booking',
+            'officer__user'
         ).all()
 
         customer_id = self.request.query_params.get('customer')
@@ -2670,44 +2766,34 @@ class ERPSMSLogListView(generics.ListAPIView):
         status      = self.request.query_params.get('status')
         booking_id  = self.request.query_params.get('booking')
 
-        if customer_id:
-            qs = qs.filter(customer_id=customer_id)
-        if sms_type:
-            qs = qs.filter(sms_type=sms_type)
-        if status:
-            qs = qs.filter(status=status)
-        if booking_id:
-            qs = qs.filter(booking_id=booking_id)
-
+        if customer_id: qs = qs.filter(customer_id=customer_id)
+        if sms_type:    qs = qs.filter(sms_type=sms_type)
+        if status:      qs = qs.filter(status=status)
+        if booking_id:  qs = qs.filter(booking_id=booking_id)
         return qs
 
 
 class ERPSMSLogDetailView(generics.RetrieveAPIView):
-    # ✅ শুধু GET — SMS log immutable
     serializer_class = ERPSMSLogSerializer
 
     def get_queryset(self):
         return ERPSMSLog.objects.select_related(
-            'customer', 'booking', 'officer__user'
+            'customer__user',    # ✅
+            'booking',
+            'officer__user'
         )
 
 
 class ERPSMSLogCreateView(generics.CreateAPIView):
     serializer_class = ERPSMSLogSerializer
 
-    def get_queryset(self):
-        return ERPSMSLog.objects.select_related(
-            'customer', 'booking', 'officer__user'
-        )
+    # ✅ CreateAPIView এ get_queryset দরকার নেই, সরিয়ে দেওয়া হয়েছে
 
-    # ✅ sent হলে sent_at auto set
     def perform_create(self, serializer):
         instance = serializer.save()
         if instance.status == 'sent' and not instance.sent_at:
-            instance.sent_at = datetime.now()
+            instance.sent_at = timezone.now()  # ✅ datetime.now() → timezone.now()
             instance.save()
-
-
 
 # =====================================================
 # 22. DOCUMENT VIEWS
@@ -2991,3 +3077,76 @@ class ERPLandAcquisitionDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset         = ERPLandAcquisition.objects.select_related('supplier', 'land_owner')
     serializer_class = ERPLandAcquisitionSerializer
     parser_classes   = [MultiPartParser, FormParser, JSONParser]
+
+
+
+
+#================================================================
+#                   COMMISSION TYPE VIEWS
+#==============================================================
+
+
+
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from .models import Percentage
+from .serializers import PercentageSerializer
+
+
+class PercentageViewSet(viewsets.ModelViewSet):
+    queryset = Percentage.objects.all()
+    serializer_class = PercentageSerializer
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        transaction_type = request.query_params.get('transaction_type')
+        if transaction_type:
+            queryset = queryset.filter(transaction_type=transaction_type)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete()
+        return Response(
+            {"detail": "Percentage deleted successfully."},
+            status=status.HTTP_204_NO_CONTENT,
+        )
+
+    @action(detail=False, methods=['get'], url_path='by-type/(?P<transaction_type>[^/.]+)')
+    def by_type(self, request, transaction_type=None):
+        queryset = self.get_queryset().filter(transaction_type=transaction_type)
+        if not queryset.exists():
+            return Response(
+                {"detail": f"No records found for type '{transaction_type}'."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+
+
