@@ -2560,7 +2560,7 @@ from mainapp.serializers import ERPHolidaySerializer
 class ERPHolidayListCreateView(generics.ListCreateAPIView):
     queryset           = ERPHoliday.objects.all()
     serializer_class   = ERPHolidaySerializer
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         qs    = super().get_queryset()
