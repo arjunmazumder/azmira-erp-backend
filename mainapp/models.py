@@ -1561,8 +1561,9 @@ class ERPHoliday(models.Model):
     date         = models.DateField(unique=True)
     holiday_type = models.CharField(max_length=50, choices=[
         ('govt',   'Government Holiday'),
-        ('office', 'Office Holiday'),
-        ('other',  'Other'),
+        ('company_holiday', "Company Holiday"),
+        ('weekend', 'Weekend'),
+        ('others',  'Others'),
     ], default='govt')
     description  = models.TextField(blank=True)
     created_at   = models.DateTimeField(auto_now_add=True)

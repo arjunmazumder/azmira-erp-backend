@@ -1,19 +1,20 @@
 from mainapp.hierarch import define_hierarchy
 from mainapp.models import Transaction, Commission, Percentage
+from decimal import Decimal
 
 
 def get_percentage(transaction_type):
     try:
         p = Percentage.objects.get(transaction_type=transaction_type)
         return {
-            0: float(p.gen_0),
-            1: float(p.gen_1),
-            2: float(p.gen_2),
-            3: float(p.gen_3),
-            4: float(p.gen_4),
-            5: float(p.gen_5),
-            6: float(p.gen_6),
-            7: float(p.gen_7),
+            0: Decimal(str(p.gen_0)),
+            1: Decimal(str(p.gen_1)),
+            2: Decimal(str(p.gen_2)),
+            3: Decimal(str(p.gen_3)),
+            4: Decimal(str(p.gen_4)),
+            5: Decimal(str(p.gen_5)),
+            6: Decimal(str(p.gen_6)),
+            7: Decimal(str(p.gen_7)),
         }
     except Percentage.DoesNotExist:
         print(f"No percentage config found for type: {transaction_type}")
@@ -27,8 +28,8 @@ def commission(amount, referred_by, transaction_type):
 
     com_data = []
     for index, user_id in enumerate(upline):
-        percent = percentage.get(index, 0)
-        commission_amount = (amount * percent) / 100
+        percent = percentage.get(index, Decimal('0'))
+        commission_amount = (amount * percent) / Decimal('100')
         com_data.append({
             "user_id": user_id,
             "level": index,
