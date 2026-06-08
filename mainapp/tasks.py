@@ -1,4 +1,4 @@
-# from celery import shared_task
+from celery import shared_task
 from django.utils import timezone
 from datetime import date, timedelta, time
 from calendar import monthrange
@@ -19,7 +19,7 @@ def is_holiday(check_date: date) -> bool:
     return False, None
 
 
-# @shared_task
+@shared_task
 def auto_mark_absent():
     from mainapp.models import ERPAttendance, ERPEmployee
 
@@ -69,7 +69,7 @@ def auto_mark_absent():
         f"Absent: {len(result['absent'])} → {result['absent']}"
     )
 
-# @shared_task
+@shared_task
 def generate_monthly_summary(year: int = None, month: int = None):
     from mainapp.models import ERPAttendance, ERPAttendanceSummary, ERPEmployee
 
@@ -127,7 +127,7 @@ def generate_monthly_summary(year: int = None, month: int = None):
 
 
 
-# @shared_task
+@shared_task
 def send_installment_reminder_48h():
     target_date = date.today() + timedelta(days=2)
 
@@ -167,7 +167,7 @@ def send_installment_reminder_48h():
             installment.save(update_fields=['sms_sent_48h_flag'])
 
 
-# @shared_task
+@shared_task
 def send_installment_due_today():
     today = date.today()
 

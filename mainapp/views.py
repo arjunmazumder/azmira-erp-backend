@@ -1078,22 +1078,24 @@ from django.http import HttpResponse
 
 
 class ERPMoneyReceiptListView(generics.ListAPIView):
-    """GET /api/erp-receipts/ — ?booking=<id>&customer=<id>&status=<status>"""
     serializer_class = ERPMoneyReceiptSerializer
 
     def get_queryset(self):
-        qs = ERPMoneyReceipt.objects.all()
-        booking_id = self.request.query_params.get('booking')
-        customer_id = self.request.query_params.get('customer')
-        receipt_status = self.request.query_params.get('status')
-        if booking_id:
-            qs = qs.filter(booking_id=booking_id)
-        if customer_id:
-            qs = qs.filter(customer_id=customer_id)
-        if receipt_status:
-            qs = qs.filter(status=receipt_status)
-        return qs
+        qs = ERPMoneyReceipt.objects.select_related(
+            'customer__user',   # ✅ customer_name এর জন্য
+            'user',             # ✅ user_name এর জন্য
+            'booking',          # ✅ booking_code এর জন্য
+            'installment',
+        ).all()
 
+        booking_id     = self.request.query_params.get('booking')
+        customer_id    = self.request.query_params.get('customer')
+        receipt_status = self.request.query_params.get('status')
+
+        if booking_id:     qs = qs.filter(booking_id=booking_id)
+        if customer_id:    qs = qs.filter(customer_id=customer_id)
+        if receipt_status: qs = qs.filter(status=receipt_status)
+        return qs
 
 class ERPMoneyReceiptDetailView(generics.RetrieveUpdateDestroyAPIView):
     """3-stage approval: pending → complete → authorized. No backdated entry."""

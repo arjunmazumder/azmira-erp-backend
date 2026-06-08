@@ -411,3 +411,51 @@ def _make_handlers(model):
 # সব model এ handler লাগাও
 for _model in TRACKED_MODELS:
     _make_handlers(_model)
+
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from .models import Transaction, ERPMoneyReceipt
+
+@receiver(post_save, sender=Transaction)
+def create_receipt_from_transaction(sender, instance, created, **kwargs):
+    if not created:
+        return
+
+    # ✅ এই check টা সরানো হয়েছে
+    # if not instance.booking or not instance.customer:
+    #     return
+
+    RECEIPT_TYPE_MAP = {
+        'booking_money': 'token',
+        'token_money':   'token',
+        'down_payment':  'down_payment',
+        'installment':   'installment',
+        'advance':       'other',
+        'others':        'other',
+    }
+    receipt_type = RECEIPT_TYPE_MAP.get(instance.transaction_type, 'other')
+
+    while True:
+        last = ERPMoneyReceipt.objects.order_by('-id').first()
+        if last and last.receipt_number.startswith('RCP-'):
+            last_number    = int(last.receipt_number.split('-')[1])
+            receipt_number = f'RCP-{str(last_number + 1).zfill(4)}'
+        else:
+            receipt_number = 'RCP-0001'
+
+        if not ERPMoneyReceipt.objects.filter(receipt_number=receipt_number).exists():
+            break
+
+    ERPMoneyReceipt.objects.create(
+        receipt_number = receipt_number,
+        booking        = instance.booking,    # None হলেও চলবে
+        customer       = instance.customer,   # None হলেও চলবে
+        user           = instance.user, 
+        receipt_type   = receipt_type,
+        amount         = instance.amount,
+        payment_date   = instance.created_at.date(),
+        payment_mode   = 'cash',
+        status         = 'pending',
+        notes          = instance.notes or '',
+    )

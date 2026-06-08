@@ -401,20 +401,26 @@ class ERPInstallmentPlanSerializer(serializers.ModelSerializer):
 # ===== 9. MONEY RECEIPT =====
 
 class ERPMoneyReceiptSerializer(serializers.ModelSerializer):
-    customer_name = serializers.ReadOnlyField(source='customer.full_name')
-    booking_code = serializers.ReadOnlyField(source='booking.booking_code')
-    status_display = serializers.SerializerMethodField()
+    customer_name        = serializers.SerializerMethodField()  # ✅
+    user_name            = serializers.SerializerMethodField()  # ✅ user field যোগ
+    booking_code         = serializers.ReadOnlyField(source='booking.booking_code')
+    status_display       = serializers.SerializerMethodField()
     payment_mode_display = serializers.SerializerMethodField()
     receipt_type_display = serializers.SerializerMethodField()
 
     class Meta:
-        model = ERPMoneyReceipt
+        model  = ERPMoneyReceipt
         fields = '__all__'
 
-    def get_status_display(self, obj): return obj.get_status_display()
+    def get_customer_name(self, obj):
+        return obj.customer.user.full_name if obj.customer else None  # ✅
+
+    def get_user_name(self, obj):
+        return obj.user.full_name if obj.user else None  # ✅
+
+    def get_status_display(self, obj):       return obj.get_status_display()
     def get_payment_mode_display(self, obj): return obj.get_payment_mode_display()
     def get_receipt_type_display(self, obj): return obj.get_receipt_type_display()
-
 
 # ===== 10. VOUCHER =====
 

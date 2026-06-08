@@ -510,7 +510,7 @@ class ERPLead(models.Model):
 #======================================================
 # TRANACTIONS TABLE
 #=====================================================
-# models.py
+
 class Transaction(models.Model):
     TRANSACTION_TYPE = [
         ('booking_money', 'Booking-Money'),
@@ -822,7 +822,6 @@ class ERPInstallmentPlan(models.Model):
 # =====================================================
 # 9. MONEY RECEIPT****************(DONE)
 # =====================================================
-
 class ERPMoneyReceipt(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -847,39 +846,49 @@ class ERPMoneyReceipt(models.Model):
         ('other', 'Other'),
     ]
 
-    id = models.BigAutoField(primary_key=True)
-    receipt_number = models.CharField(max_length=50, unique=True)
-    booking = models.ForeignKey(ERPBooking, on_delete=models.CASCADE, related_name='money_receipts')
-    customer = models.ForeignKey(ERPCustomer, on_delete=models.CASCADE, related_name='money_receipts')
-    installment = models.ForeignKey(
+    id             = models.BigAutoField(primary_key=True)
+    receipt_number = models.CharField(max_length=50, unique=True, blank=True)
+    booking        = models.ForeignKey(
+        ERPBooking, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='money_receipts'
+    )
+    customer       = models.ForeignKey(
+        ERPCustomer, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='money_receipts'
+    )
+    user           = models.ForeignKey(                          # ✅ user field যোগ করা হয়েছে
+        ERPUser, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='money_receipts'
+    )
+    installment    = models.ForeignKey(
         ERPInstallmentPlan, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='receipts'
     )
-    receipt_type = models.CharField(max_length=20, choices=RECEIPT_TYPE_CHOICES, default='installment')
-    amount = models.DecimalField(max_digits=12, decimal_places=2)
-    payment_date = models.DateField(default=date.today)
-    payment_mode = models.CharField(max_length=30, choices=PAYMENT_MODE_CHOICES, default='cash')
-    bank_name = models.CharField(max_length=100, blank=True, null=True, default='')
+    receipt_type  = models.CharField(max_length=20, choices=RECEIPT_TYPE_CHOICES, default='installment')
+    amount        = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_date  = models.DateField(default=date.today)
+    payment_mode  = models.CharField(max_length=30, choices=PAYMENT_MODE_CHOICES, default='cash')
+    bank_name     = models.CharField(max_length=100, blank=True, null=True, default='')
     cheque_number = models.CharField(max_length=50, blank=True, null=True, default='')
-    cheque_date = models.DateField(blank=True, null=True)
+    cheque_date   = models.DateField(blank=True, null=True)
     transaction_id = models.CharField(max_length=100, blank=True, null=True, default='')
-    # Cheque 30 দিনে cash না হলে জিরো
-    cheque_deposit_date = models.DateField(blank=True, null=True)
-    cheque_cleared = models.BooleanField(default=True)
-    cheque_cleared_date = models.DateField(blank=True, null=True)
+
+    cheque_deposit_date      = models.DateField(blank=True, null=True)
+    cheque_cleared           = models.BooleanField(default=True)
+    cheque_cleared_date      = models.DateField(blank=True, null=True)
     cheque_notification_sent = models.BooleanField(default=True)
-    # 3-stage: Pending → Complete → Authorized
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+
+    status              = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_by_customer = models.BooleanField(default=True)
-    e_sign = models.BooleanField(default=True)
-    e_sign_date = models.DateTimeField(blank=True, null=True)
-    completed_by = models.CharField(max_length=100, blank=True, null=True, default='')
-    completed_at = models.DateTimeField(blank=True, null=True)
-    authorized_by = models.CharField(max_length=100, blank=True, null=True, default='')
-    authorized_at = models.DateTimeField(blank=True, null=True)
-    # Backdated entry নেই
+    e_sign              = models.BooleanField(default=True)
+    e_sign_date         = models.DateTimeField(blank=True, null=True)
+    completed_by        = models.CharField(max_length=100, blank=True, null=True, default='')
+    completed_at        = models.DateTimeField(blank=True, null=True)
+    authorized_by       = models.CharField(max_length=100, blank=True, null=True, default='')
+    authorized_at       = models.DateTimeField(blank=True, null=True)
+
     entry_date = models.DateField(default=date.today)
-    notes = models.TextField(blank=True, null=True, default='')
+    notes      = models.TextField(blank=True, null=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -887,7 +896,8 @@ class ERPMoneyReceipt(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'Receipt #{self.receipt_number} - {self.user.full_name}'
+        return f'Receipt #{self.receipt_number} - {self.customer.user.full_name if self.customer else "Unknown"}'
+
 
 
 # =====================================================
