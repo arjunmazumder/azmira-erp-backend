@@ -65,23 +65,23 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'azmira.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
 # DATABASES = {
 #     'default': {
-#         'ENGINE': 'django.db.backends.mysql',
-#         'NAME': 'azmira',             # ধাপ ১-এ Workbench-এ যে নাম দিয়েছেন
-#         'USER': 'root',                  # আপনার MySQL ইউজারনেম (ডিফল্ট root)
-#         'PASSWORD': 'Test1234*',     # আপনার MySQL Workbench-এর পাসওয়ার্ড
-#         'HOST': 'localhost',             # লোকালহোস্ট আইপি
-#         'PORT': '3306',                  # MySQL এর ডিফল্ট পোর্ট
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
 #     }
 # }
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'azmira',             # ধাপ ১-এ Workbench-এ যে নাম দিয়েছেন
+        'USER': 'root',                  # আপনার MySQL ইউজারনেম (ডিফল্ট root)
+        'PASSWORD': 'Test1234*',     # আপনার MySQL Workbench-এর পাসওয়ার্ড
+        'HOST': 'localhost',             # লোকালহোস্ট আইপি
+        'PORT': '3306',                  # MySQL এর ডিফল্ট পোর্ট
+    }
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -146,15 +146,13 @@ SSL_WIRELESS_SENDER_ID = 'তোমার_sender_id'   # যেমন: AZMIRA
 
 from celery.schedules import crontab
 CELERY_BEAT_SCHEDULE = {
-    # প্রতিদিন রাত ১১:৫৯ তে absent/holiday auto-mark
     'auto-mark-absent-daily': {
         'task'    : 'mainapp.tasks.auto_mark_absent',
-        'schedule': crontab(hour=23, minute=59),
+        'schedule': crontab(hour=23, minute=59),  # রাত ১১:৫৯
     },
-    # প্রতি মাসের ১ তারিখ সকাল ১টায় summary generate
     'generate-monthly-summary': {
         'task'    : 'mainapp.tasks.generate_monthly_summary',
-        'schedule': crontab(hour=1, minute=0, day_of_month=1),
+        'schedule': crontab(hour=1, minute=0, day_of_month=1),  # মাসের ১ তারিখ
     },
     
      # প্রতিদিন সকাল ৯টায় 48h reminder
