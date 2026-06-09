@@ -3,7 +3,9 @@ asgiref==3.11.1
 billiard==4.2.4
 brotli==1.2.0
 celery==5.6.3
+certifi==2026.5.20
 cffi==2.0.0
+charset-normalizer==3.4.7
 click==8.4.1
 click-didyoumean==0.3.1
 click-plugins==1.1.1.2
@@ -16,6 +18,7 @@ django-filter==25.2
 djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
 fonttools==4.62.1
+idna==3.18
 kombu==5.6.2
 mysqlclient==2.2.8
 packaging==26.2
@@ -26,12 +29,14 @@ pydyf==0.12.1
 PyJWT==2.12.1
 pyphen==0.17.2
 python-dateutil==2.9.0.post0
+requests==2.34.2
 six==1.17.0
 sqlparse==0.5.5
 tinycss2==1.5.1
 tinyhtml5==2.1.0
 tzdata==2026.2
 tzlocal==5.3.1
+urllib3==2.7.0
 vine==5.1.0
 wcwidth==0.7.0
 weasyprint==68.1

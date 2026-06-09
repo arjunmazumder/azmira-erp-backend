@@ -1,77 +1,69 @@
-# management/commands/seed_permissions.py
-# python manage.py seed_permissions
-
-from django.core.management.base import BaseCommand
-from accesscontrol.models import ERPPermission, ERPRolePermission
-
-
 ALL_PERMISSIONS = [
-    # module,              action,   description
     # ── Project ──────────────────────────────────────
-    ('project',         'view',   'Project list ও detail দেখা'),
-    ('project',         'create', 'নতুন Project তৈরি করা'),
-    ('project',         'edit',   'Project edit করা'),
-    ('project',         'delete', 'Project delete করা'),
+    ('project',           'view',   'Project list ও detail দেখা'),
+    ('project',           'create', 'নতুন Project তৈরি করা'),
+    ('project',           'edit',   'Project edit করা'),
+    ('project',           'delete', 'Project delete করা'),
 
     # ── Property (Plot/Flat) ──────────────────────────
-    ('property',        'view',   'Plot/Flat list ও detail দেখা'),
-    ('property',        'create', 'নতুন Plot/Flat তৈরি করা'),
-    ('property',        'edit',   'Plot/Flat edit করা'),
-    ('property',        'delete', 'Plot/Flat delete করা'),
+    ('property',          'view',   'Plot/Flat list ও detail দেখা'),
+    ('property',          'create', 'নতুন Plot/Flat তৈরি করা'),
+    ('property',          'edit',   'Plot/Flat edit করা'),
+    ('property',          'delete', 'Plot/Flat delete করা'),
 
     # ── Customer ─────────────────────────────────────
-    ('customer',        'view',   'Customer list ও detail দেখা'),
-    ('customer',        'create', 'নতুন Customer তৈরি করা'),
-    ('customer',        'edit',   'Customer edit করা'),
-    ('customer',        'delete', 'Customer delete করা'),
+    ('customer',          'view',   'Customer list ও detail দেখা'),
+    ('customer',          'create', 'নতুন Customer তৈরি করা'),
+    ('customer',          'edit',   'Customer edit করা'),
+    ('customer',          'delete', 'Customer delete করা'),
 
     # ── Lead ─────────────────────────────────────────
-    ('lead',            'view',   'Lead দেখা'),
-    ('lead',            'create', 'নতুন Lead তৈরি করা'),
-    ('lead',            'edit',   'Lead edit করা'),
-    ('lead',            'delete', 'Lead delete করা'),
+    ('lead',              'view',   'Lead দেখা'),
+    ('lead',              'create', 'নতুন Lead তৈরি করা'),
+    ('lead',              'edit',   'Lead edit করা'),
+    ('lead',              'delete', 'Lead delete করা'),
 
     # ── Booking ──────────────────────────────────────
-    ('booking',         'view',   'Booking দেখা'),
-    ('booking',         'create', 'নতুন Booking তৈরি করা'),
-    ('booking',         'edit',   'Booking edit করা'),
-    ('booking',         'delete', 'Booking delete করা'),
+    ('booking',           'view',   'Booking দেখা'),
+    ('booking',           'create', 'নতুন Booking তৈরি করা'),
+    ('booking',           'edit',   'Booking edit করা'),
+    ('booking',           'delete', 'Booking delete করা'),
 
     # ── Installment ──────────────────────────────────
-    ('installment',     'view',   'Installment plan দেখা'),
-    ('installment',     'create', 'নতুন Installment তৈরি করা'),
-    ('installment',     'edit',   'Installment edit করা'),
-    ('installment',     'delete', 'Installment delete করা'),
+    ('installment',       'view',   'Installment plan দেখা'),
+    ('installment',       'create', 'নতুন Installment তৈরি করা'),
+    ('installment',       'edit',   'Installment edit করা'),
+    ('installment',       'delete', 'Installment delete করা'),
 
     # ── Money Receipt ─────────────────────────────────
-    ('receipt',         'view',   'Money receipt দেখা'),
-    ('receipt',         'create', 'নতুন receipt তৈরি করা'),
-    ('receipt',         'edit',   'Receipt edit করা'),
-    ('receipt',         'delete', 'Receipt delete করা'),
+    ('receipt',           'view',   'Money receipt দেখা'),
+    ('receipt',           'create', 'নতুন receipt তৈরি করা'),
+    ('receipt',           'edit',   'Receipt edit করা'),
+    ('receipt',           'delete', 'Receipt delete করা'),
 
     # ── Voucher ──────────────────────────────────────
-    ('voucher',         'view',   'Voucher দেখা'),
-    ('voucher',         'create', 'নতুন Voucher তৈরি করা'),
-    ('voucher',         'edit',   'Voucher edit করা'),
-    ('voucher',         'delete', 'Voucher delete করা'),
+    ('voucher',           'view',   'Voucher দেখা'),
+    ('voucher',           'create', 'নতুন Voucher তৈরি করা'),
+    ('voucher',           'edit',   'Voucher edit করা'),
+    ('voucher',           'delete', 'Voucher delete করা'),
 
     # ── Commission ────────────────────────────────────
-    ('commission',      'view',   'Commission দেখা'),
-    ('commission',      'create', 'নতুন Commission তৈরি করা'),
-    ('commission',      'edit',   'Commission edit করা'),
-    ('commission',      'delete', 'Commission delete করা'),
+    ('commission',        'view',   'Commission দেখা'),
+    ('commission',        'create', 'নতুন Commission তৈরি করা'),
+    ('commission',        'edit',   'Commission edit করা'),
+    ('commission',        'delete', 'Commission delete করা'),
 
     # ── Wallet ───────────────────────────────────────
-    ('wallet',          'view',   'Wallet দেখা'),
-    ('wallet',          'create', 'Wallet transaction তৈরি করা'),
-    ('wallet',          'edit',   'Wallet edit করা'),
-    ('wallet',          'delete', 'Wallet entry delete করা'),
+    ('wallet',            'view',   'Wallet দেখা'),
+    ('wallet',            'create', 'Wallet transaction তৈরি করা'),
+    ('wallet',            'edit',   'Wallet edit করা'),
+    ('wallet',            'delete', 'Wallet entry delete করা'),
 
     # ── Project Visit ─────────────────────────────────
-    ('project_visit',   'view',   'Project visit দেখা'),
-    ('project_visit',   'create', 'নতুন visit schedule করা'),
-    ('project_visit',   'edit',   'Visit edit করা'),
-    ('project_visit',   'delete', 'Visit delete করা'),
+    ('project_visit',     'view',   'Project visit দেখা'),
+    ('project_visit',     'create', 'নতুন visit schedule করা'),
+    ('project_visit',     'edit',   'Visit edit করা'),
+    ('project_visit',     'delete', 'Visit delete করা'),
 
     # ── Marketing Officer ─────────────────────────────
     ('marketing_officer', 'view',   'Marketing officer দেখা'),
@@ -80,112 +72,160 @@ ALL_PERMISSIONS = [
     ('marketing_officer', 'delete', 'Officer delete করা'),
 
     # ── Officer Request (TA/DA) ───────────────────────
-    ('officer_request', 'view',   'Officer request দেখা'),
-    ('officer_request', 'create', 'নতুন request তৈরি করা'),
-    ('officer_request', 'edit',   'Request edit করা'),
-    ('officer_request', 'delete', 'Request delete করা'),
+    ('officer_request',   'view',   'Officer request দেখা'),
+    ('officer_request',   'create', 'নতুন request তৈরি করা'),
+    ('officer_request',   'edit',   'Request edit করা'),
+    ('officer_request',   'delete', 'Request delete করা'),
 
     # ── Land Record ──────────────────────────────────
-    ('land_record',     'view',   'Land record দেখা'),
-    ('land_record',     'create', 'নতুন land record তৈরি করা'),
-    ('land_record',     'edit',   'Land record edit করা'),
-    ('land_record',     'delete', 'Land record delete করা'),
+    ('land_record',       'view',   'Land record দেখা'),
+    ('land_record',       'create', 'নতুন land record তৈরি করা'),
+    ('land_record',       'edit',   'Land record edit করা'),
+    ('land_record',       'delete', 'Land record delete করা'),
 
     # ── Land Acquisition ─────────────────────────────
-    ('land_acquisition', 'view',   'Land acquisition দেখা'),
-    ('land_acquisition', 'create', 'নতুন acquisition তৈরি করা'),
-    ('land_acquisition', 'edit',   'Acquisition edit করা'),
-    ('land_acquisition', 'delete', 'Acquisition delete করা'),
+    ('land_acquisition',  'view',   'Land acquisition দেখা'),
+    ('land_acquisition',  'create', 'নতুন acquisition তৈরি করা'),
+    ('land_acquisition',  'edit',   'Acquisition edit করা'),
+    ('land_acquisition',  'delete', 'Acquisition delete করা'),
+
+    # ── Supplier ─────────────────────────────────────
+    ('supplier',          'view',   'Supplier দেখা'),
+    ('supplier',          'create', 'নতুন Supplier তৈরি করা'),
+    ('supplier',          'edit',   'Supplier edit করা'),
+    ('supplier',          'delete', 'Supplier delete করা'),
+
+    # ── Land Owner ───────────────────────────────────
+    ('land_owner',        'view',   'Land owner দেখা'),
+    ('land_owner',        'create', 'নতুন Land owner তৈরি করা'),
+    ('land_owner',        'edit',   'Land owner edit করা'),
+    ('land_owner',        'delete', 'Land owner delete করা'),
 
     # ── Investor ─────────────────────────────────────
-    ('investor',        'view',   'Investor দেখা'),
-    ('investor',        'create', 'নতুন Investor তৈরি করা'),
-    ('investor',        'edit',   'Investor edit করা'),
-    ('investor',        'delete', 'Investor delete করা'),
+    ('investor',          'view',   'Investor দেখা'),
+    ('investor',          'create', 'নতুন Investor তৈরি করা'),
+    ('investor',          'edit',   'Investor edit করা'),
+    ('investor',          'delete', 'Investor delete করা'),
 
     # ── Investment ────────────────────────────────────
-    ('investment',      'view',   'Investment দেখা'),
-    ('investment',      'create', 'নতুন Investment তৈরি করা'),
-    ('investment',      'edit',   'Investment edit করা'),
-    ('investment',      'delete', 'Investment delete করা'),
+    ('investment',        'view',   'Investment দেখা'),
+    ('investment',        'create', 'নতুন Investment তৈরি করা'),
+    ('investment',        'edit',   'Investment edit করা'),
+    ('investment',        'delete', 'Investment delete করা'),
 
     # ── Dividend ─────────────────────────────────────
-    ('dividend',        'view',   'Dividend দেখা'),
-    ('dividend',        'create', 'নতুন Dividend তৈরি করা'),
-    ('dividend',        'edit',   'Dividend edit করা'),
-    ('dividend',        'delete', 'Dividend delete করা'),
+    ('dividend',          'view',   'Dividend দেখা'),
+    ('dividend',          'create', 'নতুন Dividend তৈরি করা'),
+    ('dividend',          'edit',   'Dividend edit করা'),
+    ('dividend',          'delete', 'Dividend delete করা'),
 
     # ── Employee ─────────────────────────────────────
-    ('employee',        'view',   'Employee দেখা'),
-    ('employee',        'create', 'নতুন Employee তৈরি করা'),
-    ('employee',        'edit',   'Employee edit করা'),
-    ('employee',        'delete', 'Employee delete করা'),
+    ('employee',          'view',   'Employee দেখা'),
+    ('employee',          'create', 'নতুন Employee তৈরি করা'),
+    ('employee',          'edit',   'Employee edit করা'),
+    ('employee',          'delete', 'Employee delete করা'),
 
     # ── Attendance ────────────────────────────────────
-    ('attendance',      'view',   'Attendance দেখা'),
-    ('attendance',      'create', 'Attendance তৈরি করা'),
-    ('attendance',      'edit',   'Attendance edit করা'),
-    ('attendance',      'delete', 'Attendance delete করা'),
+    ('attendance',        'view',   'Attendance দেখা'),
+    ('attendance',        'create', 'Attendance তৈরি করা'),
+    ('attendance',        'edit',   'Attendance edit করা'),
+    ('attendance',        'delete', 'Attendance delete করা'),
 
     # ── Payroll ──────────────────────────────────────
-    ('payroll',         'view',   'Payroll দেখা'),
-    ('payroll',         'create', 'নতুন Payroll তৈরি করা'),
-    ('payroll',         'edit',   'Payroll edit করা'),
-    ('payroll',         'delete', 'Payroll delete করা'),
+    ('payroll',           'view',   'Payroll দেখা'),
+    ('payroll',           'create', 'নতুন Payroll তৈরি করা'),
+    ('payroll',           'edit',   'Payroll edit করা'),
+    ('payroll',           'delete', 'Payroll delete করা'),
 
     # ── Loan ─────────────────────────────────────────
-    ('loan',            'view',   'Loan দেখা'),
-    ('loan',            'create', 'নতুন Loan তৈরি করা'),
-    ('loan',            'edit',   'Loan edit করা'),
-    ('loan',            'delete', 'Loan delete করা'),
+    ('loan',              'view',   'Loan দেখা'),
+    ('loan',              'create', 'নতুন Loan তৈরি করা'),
+    ('loan',              'edit',   'Loan edit করা'),
+    ('loan',              'delete', 'Loan delete করা'),
 
     # ── Account Head ─────────────────────────────────
-    ('account_head',    'view',   'Account head দেখা'),
-    ('account_head',    'create', 'নতুন account head তৈরি করা'),
-    ('account_head',    'edit',   'Account head edit করা'),
-    ('account_head',    'delete', 'Account head delete করা'),
+    ('account_head',      'view',   'Account head দেখা'),
+    ('account_head',      'create', 'নতুন account head তৈরি করা'),
+    ('account_head',      'edit',   'Account head edit করা'),
+    ('account_head',      'delete', 'Account head delete করা'),
 
     # ── Offer ────────────────────────────────────────
-    ('offer',           'view',   'Offer দেখা'),
-    ('offer',           'create', 'নতুন Offer তৈরি করা'),
-    ('offer',           'edit',   'Offer edit করা'),
-    ('offer',           'delete', 'Offer delete করা'),
+    ('offer',             'view',   'Offer দেখা'),
+    ('offer',             'create', 'নতুন Offer তৈরি করা'),
+    ('offer',             'edit',   'Offer edit করা'),
+    ('offer',             'delete', 'Offer delete করা'),
 
     # ── Plot ─────────────────────────────────────────
-    ('plot',            'view',   'Plot দেখা'),
-    ('plot',            'create', 'নতুন Plot তৈরি করা'),
-    ('plot',            'edit',   'Plot edit করা'),
-    ('plot',            'delete', 'Plot delete করা'),
+    ('plot',              'view',   'Plot দেখা'),
+    ('plot',              'create', 'নতুন Plot তৈরি করা'),
+    ('plot',              'edit',   'Plot edit করা'),
+    ('plot',              'delete', 'Plot delete করা'),
 
     # ── Document ─────────────────────────────────────
-    ('document',        'view',   'Document দেখা'),
-    ('document',        'create', 'নতুন Document আপলোড করা'),
-    ('document',        'edit',   'Document edit করা'),
-    ('document',        'delete', 'Document delete করা'),
+    ('document',          'view',   'Document দেখা'),
+    ('document',          'create', 'নতুন Document আপলোড করা'),
+    ('document',          'edit',   'Document edit করা'),
+    ('document',          'delete', 'Document delete করা'),
 
     # ── SMS Log ──────────────────────────────────────
-    ('sms_log',         'view',   'SMS log দেখা'),
-    ('sms_log',         'create', 'SMS পাঠানো'),
-    ('sms_log',         'edit',   'SMS log edit করা'),
-    ('sms_log',         'delete', 'SMS log delete করা'),
+    ('sms_log',           'view',   'SMS log দেখা'),
+    ('sms_log',           'create', 'SMS পাঠানো'),
+    ('sms_log',           'edit',   'SMS log edit করা'),
+    ('sms_log',           'delete', 'SMS log delete করা'),
 
     # ── Company Asset ────────────────────────────────
-    ('company_asset',   'view',   'Company asset দেখা'),
-    ('company_asset',   'create', 'নতুন asset তৈরি করা'),
-    ('company_asset',   'edit',   'Asset edit করা'),
-    ('company_asset',   'delete', 'Asset delete করা'),
+    ('company_asset',     'view',   'Company asset দেখা'),
+    ('company_asset',     'create', 'নতুন asset তৈরি করা'),
+    ('company_asset',     'edit',   'Asset edit করা'),
+    ('company_asset',     'delete', 'Asset delete করা'),
 
     # ── System Log ───────────────────────────────────
-    ('system_log',      'view',   'System log দেখা'),
-    ('system_log',      'create', 'Log তৈরি করা'),
-    ('system_log',      'edit',   'Log edit করা'),
-    ('system_log',      'delete', 'Log delete করা'),
+    ('system_log',        'view',   'System log দেখা'),
+    ('system_log',        'create', 'Log তৈরি করা'),
+    ('system_log',        'edit',   'Log edit করা'),
+    ('system_log',        'delete', 'Log delete করা'),
 
     # ── Transaction ──────────────────────────────────
-    ('transaction',     'view',   'Transaction দেখা'),
-    ('transaction',     'create', 'নতুন transaction তৈরি করা'),
-    ('transaction',     'edit',   'Transaction edit করা'),
-    ('transaction',     'delete', 'Transaction delete করা'),
+    ('transaction',       'view',   'Transaction দেখা'),
+    ('transaction',       'create', 'নতুন transaction তৈরি করা'),
+    ('transaction',       'edit',   'Transaction edit করা'),
+    ('transaction',       'delete', 'Transaction delete করা'),
+
+    # ── Voucher ──────────────────────────────────────
+    ('voucher',           'view',   'Voucher দেখা'),
+    ('voucher',           'create', 'নতুন Voucher তৈরি করা'),
+    ('voucher',           'edit',   'Voucher edit করা'),
+    ('voucher',           'delete', 'Voucher delete করা'),
+
+    # ── ERPUser ──────────────────────────────────────
+    ('user',              'view',   'User দেখা'),
+    ('user',              'create', 'নতুন User তৈরি করা'),
+    ('user',              'edit',   'User edit করা'),
+    ('user',              'delete', 'User delete করা'),
+
+    # ── Commission Rule ───────────────────────────────
+    ('commission_rule',   'view',   'Commission rule দেখা'),
+    ('commission_rule',   'create', 'নতুন commission rule তৈরি করা'),
+    ('commission_rule',   'edit',   'Commission rule edit করা'),
+    ('commission_rule',   'delete', 'Commission rule delete করা'),
+
+    # ── Percentage ───────────────────────────────────
+    ('percentage',        'view',   'Percentage config দেখা'),
+    ('percentage',        'create', 'নতুন percentage config তৈরি করা'),
+    ('percentage',        'edit',   'Percentage config edit করা'),
+    ('percentage',        'delete', 'Percentage config delete করা'),
+
+    # ── Land Power Assignment ─────────────────────────
+    ('land_power',        'view',   'Land power assignment দেখা'),
+    ('land_power',        'create', 'নতুন land power assignment তৈরি করা'),
+    ('land_power',        'edit',   'Land power assignment edit করা'),
+    ('land_power',        'delete', 'Land power assignment delete করা'),
+
+    # ── Project Visit ─────────────────────────────────
+    ('project_visit',     'view',   'Project visit দেখা'),
+    ('project_visit',     'create', 'নতুন visit schedule করা'),
+    ('project_visit',     'edit',   'Visit edit করা'),
+    ('project_visit',     'delete', 'Visit delete করা'),
 ]
 
 
@@ -194,40 +234,41 @@ DEFAULT_ROLE_PERMISSIONS = [
     # ══════════════════════════════════════════════════
     # EMPLOYEE
     # ══════════════════════════════════════════════════
-    ('employee', 'project.view',        'all'),
-    ('employee', 'property.view',       'all'),
-    ('employee', 'plot.view',           'all'),
-    ('employee', 'offer.view',          'all'),
-    ('employee', 'attendance.view',     'own'),
-    ('employee', 'payroll.view',        'own'),
-    ('employee', 'wallet.view',         'own'),
-    ('employee', 'loan.view',           'own'),
-    ('employee', 'document.view',       'own'),
+    ('employee', 'project.view',          'all'),
+    ('employee', 'property.view',         'all'),
+    ('employee', 'plot.view',             'all'),
+    ('employee', 'offer.view',            'all'),
+    ('employee', 'attendance.view',       'own'),
+    ('employee', 'payroll.view',          'own'),
+    ('employee', 'wallet.view',           'own'),
+    ('employee', 'loan.view',             'own'),
+    ('employee', 'document.view',         'own'),
 
     # ══════════════════════════════════════════════════
     # MARKETING OFFICER
     # ══════════════════════════════════════════════════
-    ('marketing_officer', 'project.view',           'all'),
-    ('marketing_officer', 'property.view',          'all'),
-    ('marketing_officer', 'plot.view',              'all'),
-    ('marketing_officer', 'customer.view',          'own'),
-    ('marketing_officer', 'customer.create',        'own'),
-    ('marketing_officer', 'lead.view',              'own'),
-    ('marketing_officer', 'lead.create',            'own'),
-    ('marketing_officer', 'lead.edit',              'own'),
-    ('marketing_officer', 'booking.view',           'own'),
-    ('marketing_officer', 'installment.view',       'own'),
-    ('marketing_officer', 'receipt.view',           'own'),
-    ('marketing_officer', 'commission.view',        'own'),
-    ('marketing_officer', 'wallet.view',            'own'),
-    ('marketing_officer', 'project_visit.view',     'own'),
-    ('marketing_officer', 'project_visit.create',   'own'),
-    ('marketing_officer', 'project_visit.edit',     'own'),
-    ('marketing_officer', 'officer_request.view',   'own'),
-    ('marketing_officer', 'officer_request.create', 'own'),
-    ('marketing_officer', 'officer_request.edit',   'own'),
-    ('marketing_officer', 'document.view',          'own'),
-    ('marketing_officer', 'offer.view',             'all'),
+    ('marketing_officer', 'project.view',             'all'),
+    ('marketing_officer', 'property.view',            'all'),
+    ('marketing_officer', 'plot.view',                'all'),
+    ('marketing_officer', 'customer.view',            'own'),
+    ('marketing_officer', 'customer.create',          'own'),
+    ('marketing_officer', 'lead.view',                'own'),
+    ('marketing_officer', 'lead.create',              'own'),
+    ('marketing_officer', 'lead.edit',                'own'),
+    ('marketing_officer', 'booking.view',             'own'),
+    ('marketing_officer', 'installment.view',         'own'),
+    ('marketing_officer', 'receipt.view',             'own'),
+    ('marketing_officer', 'commission.view',          'own'),
+    ('marketing_officer', 'wallet.view',              'own'),
+    ('marketing_officer', 'project_visit.view',       'own'),
+    ('marketing_officer', 'project_visit.create',     'own'),
+    ('marketing_officer', 'project_visit.edit',       'own'),
+    ('marketing_officer', 'officer_request.view',     'own'),
+    ('marketing_officer', 'officer_request.create',   'own'),
+    ('marketing_officer', 'officer_request.edit',     'own'),
+    ('marketing_officer', 'document.view',            'own'),
+    ('marketing_officer', 'offer.view',               'all'),
+    ('marketing_officer', 'transaction.view',         'own'),
 
     # ══════════════════════════════════════════════════
     # MARKETING MANAGER
@@ -256,6 +297,83 @@ DEFAULT_ROLE_PERMISSIONS = [
     ('marketing_manager', 'document.view',            'all'),
     ('marketing_manager', 'offer.view',               'all'),
     ('marketing_manager', 'marketing_officer.view',   'all'),
+    ('marketing_manager', 'transaction.view',         'all'),
+    ('marketing_manager', 'sms_log.view',             'all'),
+
+    # ══════════════════════════════════════════════════
+    # ACCOUNTS OFFICER
+    # ══════════════════════════════════════════════════
+    ('accounts', 'project.view',          'all'),
+    ('accounts', 'property.view',         'all'),
+    ('accounts', 'plot.view',             'all'),
+    ('accounts', 'customer.view',         'all'),
+    ('accounts', 'booking.view',          'all'),
+    ('accounts', 'booking.edit',          'all'),
+    ('accounts', 'installment.view',      'all'),
+    ('accounts', 'installment.create',    'all'),
+    ('accounts', 'installment.edit',      'all'),
+    ('accounts', 'receipt.view',          'all'),
+    ('accounts', 'receipt.create',        'all'),
+    ('accounts', 'receipt.edit',          'all'),
+    ('accounts', 'voucher.view',          'all'),
+    ('accounts', 'voucher.create',        'all'),
+    ('accounts', 'voucher.edit',          'all'),
+    ('accounts', 'commission.view',       'all'),
+    ('accounts', 'wallet.view',           'all'),
+    ('accounts', 'wallet.edit',           'all'),
+    ('accounts', 'transaction.view',      'all'),
+    ('accounts', 'transaction.create',    'all'),
+    ('accounts', 'account_head.view',     'all'),
+    ('accounts', 'account_head.create',   'all'),
+    ('accounts', 'account_head.edit',     'all'),
+    ('accounts', 'investment.view',       'all'),
+    ('accounts', 'dividend.view',         'all'),
+    ('accounts', 'payroll.view',          'all'),
+    ('accounts', 'payroll.create',        'all'),
+    ('accounts', 'loan.view',             'all'),
+    ('accounts', 'document.view',         'all'),
+    ('accounts', 'sms_log.view',          'all'),
+
+    # ══════════════════════════════════════════════════
+    # HR MANAGER
+    # ══════════════════════════════════════════════════
+    ('hr', 'employee.view',       'all'),
+    ('hr', 'employee.create',     'all'),
+    ('hr', 'employee.edit',       'all'),
+    ('hr', 'attendance.view',     'all'),
+    ('hr', 'attendance.create',   'all'),
+    ('hr', 'attendance.edit',     'all'),
+    ('hr', 'payroll.view',        'all'),
+    ('hr', 'payroll.create',      'all'),
+    ('hr', 'payroll.edit',        'all'),
+    ('hr', 'loan.view',           'all'),
+    ('hr', 'loan.create',         'all'),
+    ('hr', 'loan.edit',           'all'),
+    ('hr', 'document.view',       'all'),
+    ('hr', 'document.create',     'all'),
+    ('hr', 'user.view',           'all'),
+
+    # ══════════════════════════════════════════════════
+    # CUSTOMER CARE
+    # ══════════════════════════════════════════════════
+    ('customer_care', 'project.view',        'all'),
+    ('customer_care', 'property.view',       'all'),
+    ('customer_care', 'plot.view',           'all'),
+    ('customer_care', 'customer.view',       'all'),
+    ('customer_care', 'customer.edit',       'all'),
+    ('customer_care', 'lead.view',           'all'),
+    ('customer_care', 'lead.create',         'all'),
+    ('customer_care', 'lead.edit',           'all'),
+    ('customer_care', 'booking.view',        'all'),
+    ('customer_care', 'installment.view',    'all'),
+    ('customer_care', 'receipt.view',        'all'),
+    ('customer_care', 'project_visit.view',  'all'),
+    ('customer_care', 'project_visit.create','all'),
+    ('customer_care', 'project_visit.edit',  'all'),
+    ('customer_care', 'document.view',       'all'),
+    ('customer_care', 'offer.view',          'all'),
+    ('customer_care', 'sms_log.view',        'all'),
+    ('customer_care', 'sms_log.create',      'all'),
 
     # ══════════════════════════════════════════════════
     # CUSTOMER
@@ -274,17 +392,19 @@ DEFAULT_ROLE_PERMISSIONS = [
     # ══════════════════════════════════════════════════
     # INVESTOR
     # ══════════════════════════════════════════════════
-    ('investor', 'project.view',     'all'),
-    ('investor', 'property.view',    'all'),
-    ('investor', 'plot.view',        'all'),
-    ('investor', 'investment.view',  'own'),
-    ('investor', 'dividend.view',    'own'),
-    ('investor', 'wallet.view',      'own'),
-    ('investor', 'document.view',    'own'),
-    ('investor', 'offer.view',       'all'),
+    ('investor', 'project.view',      'all'),
+    ('investor', 'property.view',     'all'),
+    ('investor', 'plot.view',         'all'),
+    ('investor', 'investment.view',   'own'),
+    ('investor', 'dividend.view',     'own'),
+    ('investor', 'wallet.view',       'own'),
+    ('investor', 'document.view',     'own'),
+    ('investor', 'offer.view',        'all'),
+    ('investor', 'land_power.view',   'own'),
 ]
 
-
+from django.core.management.base import BaseCommand
+from accesscontrol.models import ERPPermission, ERPRolePermission
 class Command(BaseCommand):
     help = 'সব model এর default permission গুলো database এ insert করে'
 
@@ -305,7 +425,6 @@ class Command(BaseCommand):
 
         self.stdout.write('🔐 Permission seeding শুরু হচ্ছে...\n')
 
-        # ── Step 1: ERPPermission তৈরি ──────────────────
         created_perms = 0
         for module, action, description in ALL_PERMISSIONS:
             _, created = ERPPermission.objects.get_or_create(
@@ -319,17 +438,13 @@ class Command(BaseCommand):
         total_perms = ERPPermission.objects.count()
         self.stdout.write(f'  ✅ {created_perms} নতুন permission তৈরি (মোট: {total_perms})\n')
 
-        # ── Step 2: ERPRolePermission তৈরি ──────────────
         created_role_perms = 0
         errors = []
 
         for role, codename, scope in DEFAULT_ROLE_PERMISSIONS:
             try:
-                module, action = codename.split('.')          # ✅ fix
-                perm = ERPPermission.objects.get(
-                    module=module,
-                    action=action
-                )
+                module, action = codename.split('.')
+                perm = ERPPermission.objects.get(module=module, action=action)
                 _, created = ERPRolePermission.objects.get_or_create(
                     role=role,
                     permission=perm,
@@ -345,15 +460,17 @@ class Command(BaseCommand):
         total_role_perms = ERPRolePermission.objects.count()
         self.stdout.write(f'  ✅ {created_role_perms} নতুন role permission তৈরি (মোট: {total_role_perms})\n')
 
-        # ── Errors ──────────────────────────────────────
         if errors:
             self.stdout.write('\n⚠️  কিছু সমস্যা হয়েছে:\n')
             for err in errors:
                 self.stdout.write(f'  {err}\n')
 
-        # ── Summary ─────────────────────────────────────
         self.stdout.write('\n📊 Summary:\n')
-        for role in ['employee', 'marketing_officer', 'marketing_manager', 'customer', 'investor']:
+        all_roles = [
+            'employee', 'marketing_officer', 'marketing_manager',
+            'accounts', 'hr', 'customer_care', 'customer', 'investor'
+        ]
+        for role in all_roles:
             count = ERPRolePermission.objects.filter(role=role, is_active=True).count()
             self.stdout.write(f'  {role:<25} → {count} permissions\n')
 

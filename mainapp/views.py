@@ -126,6 +126,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny,IsAuthenticated
 from rest_framework import status
+from mainapp.models import ERPBooking, ERPInvestment  
 
 from mainapp.api_permissions import (
     HasModulePermission,
@@ -146,6 +147,8 @@ from mainapp.filters import ERPUserFilter
 
 class ERPUserListView(generics.ListAPIView):
     """GET /api/erp-users/ — all user list"""
+    permission_classes = [IsAuthenticated]
+
     queryset = ERPUser.objects.all()
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = ERPUserFilter
@@ -159,6 +162,7 @@ class ERPUserListView(generics.ListAPIView):
 
 class ERPUserDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PUT/PATCH/DELETE /api/erp-users/<pk>/"""
+    permission_classes = [IsAuthenticated]
     queryset = ERPUser.objects.all()
     serializer_class = ERPUserSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
@@ -175,35 +179,88 @@ class ERPUserCreateView(generics.CreateAPIView):
     queryset = ERPUser.objects.all()
     serializer_class = ERPUserCreateSerializer
     parser_classes = [JSONParser, FormParser, MultiPartParser]
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
 
 
 from .accesscontrol import generate_access_control
+
 class MyProfileView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
-        """প্রোফাইল দেখা"""
         user = request.user
         user_data = ERPUserProfileSerializer(user, context={'request': request}).data
-
-        # 🔐 ডাইনামিক এক্সেস কন্ট্রোল জেনারেট করা
         access_control = generate_access_control(user)
-        
-        # সিরিয়ালাইজড ডাটার ভেতরেই 'access_control' ঢুকিয়ে দেওয়া
         user_data['access_control'] = access_control
+
+        # =====================================================
+        # Booking Information
+        # =====================================================
+        bookings = ERPBooking.objects.filter(
+            customer__user=user
+        ).select_related('project', 'plot').values(
+            'booking_code',
+            'status',
+            'booking_date',
+            'total_price',
+            'final_price',
+            'total_paid',
+            'total_due',
+            'project__project_name',
+            'plot__plot_number',
+        )
+
+        booking_data = [
+            {
+                'booking_code'  : b['booking_code'],
+                'status'        : b['status'],
+                'booking_date'  : b['booking_date'],
+                'project'       : b['project__project_name'],
+                'plot'          : b['plot__plot_number'],
+                'total_price'   : b['total_price'],
+                'final_price'   : b['final_price'],
+                'total_paid'    : b['total_paid'],
+                'total_due'     : b['total_due'],
+            }
+            for b in bookings
+        ]
+
+        # =====================================================
+        # Investment Information
+        # =====================================================
+        investments = ERPInvestment.objects.filter(
+            investor__user=user
+        ).select_related('project').values(
+            'investment_id',
+            'invest_amount',       # amount → invest_amount
+            'invest_date',         # investment_date → invest_date
+            'status',
+            'project__project_name',
+        )
+
+        investment_data = [
+            {
+                'investment_id'  : i['investment_id'],
+                'project'        : i['project__project_name'],
+                'amount'         : i['invest_amount'],
+                'investment_date': i['invest_date'],
+                'status'         : i['status'],
+            }
+            for i in investments
+        ]
 
         return Response({
             'success': True,
             'data': {
-                'user': user_data,
+                'user'        : user_data,
+                'bookings'    : booking_data,
+                'investments' : investment_data,
             }
         })
 
     def patch(self, request):
-        """প্রোফাইল আপডেট"""
         user = request.user
         user_serializer = ERPUserProfileSerializer(
             user, data=request.data, partial=True, context={'request': request}
@@ -216,8 +273,7 @@ class MyProfileView(APIView):
             }, status=400)
 
         user_serializer.save()
-        
-        # 🔐 আপডেট হওয়ার পর আবার নতুন করে পারমিশন চেক করা (যদি রোল চেঞ্জ হয়ে থাকে)
+
         user_data = user_serializer.data
         access_control = generate_access_control(user)
         user_data['access_control'] = access_control
@@ -229,6 +285,7 @@ class MyProfileView(APIView):
                 'user': user_data,
             }
         })
+        
 
 
 class ALLRoleChoicesView(APIView):
@@ -253,12 +310,28 @@ from mainapp.log_utils import create_log, get_ip  # ফাইলের উপর
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def erp_user_login(request):
-    username = request.data.get('username')
-    password = request.data.get('password')
+    username = request.data.get('username', '').strip()
+    password = request.data.get('password', '').strip()
 
-    if not username or not password:
-        return Response({'error': 'Username and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+    # =====================================================
+    # Field Validation
+    # =====================================================
+    errors = {}
 
+    if not username:
+        errors['username'] = 'Username is required'
+    if not password:
+        errors['password'] = 'Password is required'
+
+    if errors:
+        return Response({
+            'success': False,
+            'errors': errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # =====================================================
+    # Authentication
+    # =====================================================
     user = authenticate(username=username, password=password)
 
     if user is not None:
@@ -269,14 +342,26 @@ def erp_user_login(request):
 
             if 'admin' in user_roles or 'super_admin' in user_roles:
                 all_modules = [
-                    'project', 'plot', 'booking', 'installment', 'receipt',
-                    'commission', 'wallet', 'lead', 'attendance', 'payroll',
-                    'investment', 'dividend', 'officer_request', 'document', 'offer'
+                    'project',          'property',         'plot',
+                    'customer',         'lead',             'booking',
+                    'installment',      'receipt',          'voucher',
+                    'commission',       'commission_rule',  'wallet',
+                    'transaction',      'project_visit',    'marketing_officer',
+                    'officer_request',  'land_record',      'land_acquisition',
+                    'supplier',         'land_owner',       'investor',
+                    'investment',       'dividend',         'land_power',
+                    'employee',         'attendance',       'payroll',
+                    'loan',             'account_head',     'offer',
+                    'document',         'sms_log',          'company_asset',
+                    'system_log',       'percentage',       'user',
                 ]
                 for module in all_modules:
                     access_control[module] = {
-                        "view": True, "create": True,
-                        "edit": True, "delete": True, "scope": "all"
+                        "view"  : True,
+                        "create": True,
+                        "edit"  : True,
+                        "delete": True,
+                        "scope" : "all"
                     }
             else:
                 for role in user_roles:
@@ -288,8 +373,11 @@ def erp_user_login(request):
                             continue
                         if module not in access_control:
                             access_control[module] = {
-                                "view": False, "create": False,
-                                "edit": False, "delete": False, "scope": "own"
+                                "view"  : False,
+                                "create": False,
+                                "edit"  : False,
+                                "delete": False,
+                                "scope" : "own"
                             }
                         if action in access_control[module]:
                             access_control[module][action] = True
@@ -298,7 +386,6 @@ def erp_user_login(request):
                         elif scope == 'own' and access_control[module]["scope"] != 'all':
                             access_control[module]["scope"] = 'own'
 
-            # ✅ Login success log
             create_log(
                 action='User Login',
                 module='AUTH',
@@ -308,21 +395,20 @@ def erp_user_login(request):
                 log_level='info',
             )
 
-            response_data = {
+            return Response({
+                'success': True,
                 'refresh': str(refresh),
-                'access': str(refresh.access_token),
-                'user': {
-                    'id': user.id,
-                    'username': user.username,
-                    'full_name': user.full_name,
-                    'roles': user_roles,
-                    'access_control': access_control
+                'access' : str(refresh.access_token),
+                'user'   : {
+                    'id'            : user.id,
+                    'username'      : user.username,
+                    'full_name'     : user.full_name,
+                    'roles'         : user_roles,
+                    'access_control': access_control,
                 }
-            }
-            return Response(response_data, status=status.HTTP_200_OK)
+            }, status=status.HTTP_200_OK)
 
         else:
-            # ✅ Disabled account log
             create_log(
                 action='Login Blocked',
                 module='AUTH',
@@ -330,10 +416,17 @@ def erp_user_login(request):
                 ip_address=get_ip(request),
                 log_level='warning',
             )
-            return Response({'error': 'Account is disabled'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({
+                'success': False,
+                'errors' : {
+                    'username': 'This account has been disabled'
+                }
+            }, status=status.HTTP_403_FORBIDDEN)
 
     else:
-        # ✅ Login failed log
+        from mainapp.models import ERPUser
+        user_exists = ERPUser.objects.filter(username=username).exists()
+
         create_log(
             action='Login Failed',
             module='AUTH',
@@ -341,13 +434,27 @@ def erp_user_login(request):
             ip_address=get_ip(request),
             log_level='warning',
         )
-        return Response({'error': 'Invalid username or password'}, status=status.HTTP_401_UNAUTHORIZED)
 
+        if user_exists:
+            return Response({
+                'success': False,
+                'errors' : {
+                    'password': 'Incorrect password'
+                }
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        else:
+            return Response({
+                'success': False,
+                'errors' : {
+                    'username': 'No account found with this username'
+                }
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        
 
-
-
+        
 class ERPUserByRoleView(generics.ListAPIView):
     """GET /api/erp-users/role/<role>/"""
+    permission_classes = [IsAuthenticated]
     serializer_class = ERPUserListSerializer
 
     def get_queryset(self):
@@ -438,7 +545,7 @@ class ERPPlotListView(generics.ListAPIView):
         'plot_number',
         'created_at',
     ]
-    ordering = ['plot_number']  # default ordering
+    ordering = ['plot_number']  
  
     def get_queryset(self):
         return Property.objects.select_related('project').all()
@@ -515,7 +622,11 @@ from mainapp.api_permissions import HasModulePermission
 # =====================================================
 
 class ERPCustomerListView(generics.ListAPIView):
-    queryset         = ERPCustomer.objects.select_related('user').filter(is_active=True)
+    queryset = ERPCustomer.objects.select_related('user').prefetch_related(
+        'bookings__project',  
+        'bookings__plot',
+    ).filter(is_active=True)
+
     serializer_class = ERPCustomerSerializer
     parser_classes   = [MultiPartParser, FormParser, JSONParser]
     permission_classes  = [HasModulePermission]

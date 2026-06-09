@@ -206,15 +206,36 @@ class ERPLandRecordSerializer(serializers.ModelSerializer):
 
 # ===== 5. CUSTOMER =====
 
+
+class CustomerBookingSerializer(serializers.ModelSerializer):
+    project = serializers.CharField(source='project.project_name', read_only=True)
+    plot    = serializers.CharField(source='plot.plot_number', read_only=True)
+
+    class Meta:
+        model  = ERPBooking
+        fields = [
+            'id',
+            'booking_code',
+            'project',
+            'plot',
+            'status',
+            'booking_date',
+            'total_price',
+            'final_price',
+            'total_paid',
+            'total_due',
+        ]
+
+
 class ERPCustomerSerializer(serializers.ModelSerializer):
-    user    = ERPUserSerializer(read_only=True)
-    user_id = serializers.PrimaryKeyRelatedField(
-                queryset=ERPUser.objects.all(),
-                source='user',
-                write_only=True    # ← True করুন, GET এ user object আসবে
-              )
-    
+    user     = ERPUserSerializer(read_only=True)
+    user_id  = serializers.PrimaryKeyRelatedField(
+                    queryset=ERPUser.objects.all(),
+                    source='user',
+                    write_only=True
+                )
     is_active = serializers.BooleanField(default=True, required=False)
+    bookings  = CustomerBookingSerializer(many=True, read_only=True)  # ✅ booking details
 
     class Meta:
         model  = ERPCustomer
@@ -223,25 +244,16 @@ class ERPCustomerSerializer(serializers.ModelSerializer):
             'customer_code',
             'customer_type',
             'source',
-            'user',        # GET এ পুরো object
-            'user_id',     # POST/PATCH এ id পাঠাবেন
+            'user',
+            'user_id',
             'is_active',
             'created_by',
             'created_at',
             'updated_at',
+            'bookings',       # ✅ added
         ]
 
-# class ERPCustomerSerializer(serializers.ModelSerializer):
-#     referred_by = serializers.SerializerMethodField()
-#     class Meta:
-#         model = ERPCustomer
-#         fields = '__all__'
-
-#     def get_referred_by(self, obj):
-#         if obj.referred_by and obj.referred_by.username:
-#             return obj.referred_by.username
-#         return None
-
+        
 # ===== 6. LEAD =====
 
 class ERPLeadSerializer(serializers.ModelSerializer):
