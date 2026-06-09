@@ -27,9 +27,18 @@ def commission(amount, referred_by, transaction_type):
     percentage = get_percentage(transaction_type)
 
     com_data = []
-    for index, user_id in enumerate(upline):
+
+    for index, item in enumerate(upline):
+        user_id = item["user_id"]
+        is_active = item["is_active"]
+
+        if not is_active:
+            print(f"User {user_id} is inactive — skipping commission")
+            continue  # level ঠিক থাকবে, শুধু commission generate হবে না
+
         percent = percentage.get(index, Decimal('0'))
         commission_amount = (amount * percent) / Decimal('100')
+
         com_data.append({
             "user_id": user_id,
             "level": index,
@@ -46,7 +55,6 @@ def commission(amount, referred_by, transaction_type):
         )
 
     return com_data
-
 
 def create_commission_table(pk):
     print("i am in create commission table")

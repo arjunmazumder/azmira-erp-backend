@@ -142,9 +142,14 @@ from mainapp.api_permissions import (
 # 1. USER & AUTH VIEWS
 # =====================================================
 
+from mainapp.filters import ERPUserFilter
+
 class ERPUserListView(generics.ListAPIView):
     """GET /api/erp-users/ — all user list"""
     queryset = ERPUser.objects.all()
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filterset_class = ERPUserFilter
+    search_fields = ['full_name', 'username']  # ?search=হানিফ
 
     def get_serializer_class(self):
         if self.request.query_params.get('list'):
@@ -905,27 +910,43 @@ class CommissionSummaryView(generics.ListAPIView):
 # =====================================================
 # 7. BOOKING VIEWS
 # =====================================================
+from rest_framework.filters import SearchFilter
 
 class ERPBookingListView(generics.ListAPIView):
-    """GET /api/erp-bookings/ — ?customer=<id>&project=<id>&status=<status>"""
     serializer_class = ERPBookingSerializer
+    filter_backends = [SearchFilter]
+    search_fields = [
+        'booking_code',
+        'customer__customer_code',
+        'customer__user__full_name',
+        'project__project_name',
+    ]
 
     def get_queryset(self):
-        qs = ERPBooking.objects.all()
-        customer_id = self.request.query_params.get('customer')
-        project_id = self.request.query_params.get('project')
+        qs = ERPBooking.objects.select_related(
+            'customer__user', 'project', 'plot', 'marketing_officer__user'
+        )
+        customer_id    = self.request.query_params.get('customer')
+        project_id     = self.request.query_params.get('project')
         booking_status = self.request.query_params.get('status')
+
         if customer_id:
             qs = qs.filter(customer_id=customer_id)
         if project_id:
             qs = qs.filter(project_id=project_id)
         if booking_status:
             qs = qs.filter(status=booking_status)
+
         return qs
 
 
+
+
+
 class ERPBookingDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = ERPBooking.objects.all()
+    queryset = ERPBooking.objects.select_related(
+        'customer__user', 'project', 'plot', 'marketing_officer__user'
+    )
     serializer_class = ERPBookingSerializer
 
     def update(self, request, *args, **kwargs):
@@ -944,7 +965,6 @@ class ERPBookingDetailView(generics.RetrieveUpdateDestroyAPIView):
     def _recalculate_installments(self, booking):
         unpaid_installments = booking.installment_plan.filter(is_paid=False)
         count = unpaid_installments.count()
-
         if count > 0:
             per_installment = booking.total_due / count
             for inst in unpaid_installments:
@@ -960,13 +980,16 @@ class ERPBookingCreateView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        booking = serializer.save()
+        booking = serializer.save()  # booking_code model save()-এ auto generate হবে
 
         if booking.plot:
             booking.plot.status = 'booked'
             booking.plot.save()
 
-        return Response(self.get_serializer(booking).data, status=status.HTTP_201_CREATED)
+        return Response(
+            self.get_serializer(booking).data,
+            status=status.HTTP_201_CREATED
+        )
 
 
 # =====================================================

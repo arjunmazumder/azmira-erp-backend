@@ -114,7 +114,7 @@ class ERPUser(AbstractBaseUser, PermissionsMixin):
     objects = ERPUserManager()
     referred_by = models.ForeignKey('self',on_delete=models.SET_NULL,null=True, blank=True,related_name='referred_users')
     USERNAME_FIELD = 'username'
-    REQUIRED_FIELDS = ['email','full_name']
+    REQUIRED_FIELDS = ['email','full_name','phone','nid']
 
     class Meta:
         ordering = ['-created_at']
@@ -636,6 +636,26 @@ from datetime import date, timedelta
 from django.db import models
 from django.db.models import Sum
 
+def generate_booking_code(project):
+    # প্রতিটা word এর first letter নিয়ে prefix বানাও
+    words = project.project_name.split()
+    prefix = ''.join(word[0].upper() for word in words if word)
+
+    last = ERPBooking.objects.filter(
+        booking_code__startswith=prefix
+    ).order_by('-booking_code').first()
+
+    if last:
+        try:
+            last_num = int(last.booking_code.split('-')[-1])
+        except ValueError:
+            last_num = 0
+    else:
+        last_num = 0
+
+    new_num = last_num + 1
+    return f"{prefix}-{str(new_num).zfill(4)}"
+
 
 class ERPBooking(models.Model):
 
@@ -656,7 +676,7 @@ class ERPBooking(models.Model):
     ]
 
     id                = models.BigAutoField(primary_key=True)
-    booking_code      = models.CharField(max_length=50, unique=True)
+    booking_code      = models.CharField(max_length=50, unique=True, blank=True)  # blank=True — auto generate হবে
     customer          = models.ForeignKey(ERPCustomer, on_delete=models.CASCADE, related_name='bookings')
     plot              = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='bookings')
     project           = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='bookings')
@@ -667,10 +687,10 @@ class ERPBooking(models.Model):
     booking_date      = models.DateField(default=date.today)
     status            = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending')
 
-    total_price      = models.DecimalField(max_digits=16, decimal_places=2)
-    discount_amount  = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    discount_note    = models.CharField(max_length=200, blank=True, null=True, default='')
-    final_price      = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    total_price       = models.DecimalField(max_digits=16, decimal_places=2)
+    discount_amount   = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    discount_note     = models.CharField(max_length=200, blank=True, null=True, default='')
+    final_price       = models.DecimalField(max_digits=16, decimal_places=2, default=0)
 
     token_amount      = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     token_paid_date   = models.DateField(blank=True, null=True)
@@ -687,7 +707,6 @@ class ERPBooking(models.Model):
     total_paid = models.DecimalField(max_digits=16, decimal_places=2, default=0)
     total_due  = models.DecimalField(max_digits=16, decimal_places=2, default=0)
 
-    # Cancellation
     cancel_reason = models.CharField(max_length=30, choices=CANCEL_REASON_CHOICES, blank=True, null=True, default='')
     cancel_date   = models.DateField(blank=True, null=True)
     cancel_note   = models.TextField(blank=True, null=True, default='')
@@ -695,7 +714,6 @@ class ERPBooking(models.Model):
     refund_date   = models.DateField(blank=True, null=True)
     refund_note   = models.TextField(blank=True, null=True, default='')
 
-    # Transfer
     transferred_to          = models.ForeignKey(
         ERPCustomer, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='transferred_bookings'
@@ -719,25 +737,29 @@ class ERPBooking(models.Model):
         if not self.token_paid_date or not self.token_amount:
             return None
         amount = float(self.token_amount)
-        days   = 30 if amount <= 500 else 60 if amount <= 1000 else 90
+        days = 30 if amount <= 500 else 60 if amount <= 1000 else 90
         return self.token_paid_date + timedelta(days=days)
 
     def save(self, *args, **kwargs):
-    # ১. Guard clause
+        # ১. booking_code auto-generate — শুধু নতুন object এর জন্য
+        if not self.pk and not self.booking_code:
+            self.booking_code = generate_booking_code(self.project)
+
+        # ২. Guard clause — signal থেকে partial update হলে early return
         update_fields = kwargs.get('update_fields')
         if update_fields and set(update_fields) <= {'total_paid', 'total_due', 'updated_at'}:
             super().save(*args, **kwargs)
             return
 
-        # ২. Final Price
-        total         = self.total_price or 0
-        discount      = self.discount_amount or 0
+        # ৩. Final price
+        total = self.total_price or 0
+        discount = self.discount_amount or 0
         self.final_price = total - discount
 
-        # ৩. total_due — প্রথমবার total_paid=0, তাই final_price=total_due ✅
+        # ৪. Total due
         self.total_due = self.final_price - self.total_paid
 
-        # ৪. Token expiry
+        # ৫. Token expiry
         if self.token_paid_date and self.token_amount and not self.token_expiry_date:
             self.token_expiry_date = self.calculate_token_expiry()
 
@@ -818,7 +840,7 @@ class ERPInstallmentPlan(models.Model):
         if self.booking:
             self.booking.save()
 
-
+ 
 # =====================================================
 # 9. MONEY RECEIPT****************(DONE)
 # =====================================================
@@ -1263,7 +1285,7 @@ class ERPLoan(models.Model):
 class ERPInvestor(models.Model):
     id = models.BigAutoField(primary_key=True)
     user = models.OneToOneField(ERPUser, on_delete=models.CASCADE, related_name='investor_profile')
-    investor_code = models.CharField(max_length=50, unique=True, blank=True)
+    investor_code = models.CharField(max_length=50, unique=True, blank=True)  
     marketing_officer = models.ForeignKey('ERPMarketingOfficer', on_delete=models.SET_NULL, null=True, blank=True, related_name='investors')
     bank_name = models.CharField(max_length=100, blank=True, null=True, default='')
     bank_account = models.CharField(max_length=50, blank=True, null=True, default='')
@@ -1292,7 +1314,7 @@ class ERPInvestor(models.Model):
                         last_num = 0
                 else:
                     last_num = 0
-                self.investor_code = f'ASH-{str(last_num + 1).zfill(4)}'
+                self.investor_code = f'ID-ASH-{str(last_num + 1).zfill(4)}'  # ID-ASH-0001
         super().save(*args, **kwargs)
 
 
@@ -1493,7 +1515,7 @@ class ERPEmployee(models.Model):
                 next_num = 1
 
             while True:
-                code = f"EMP-{next_num:04d}"
+                code = f"SCLM-{next_num:04d}"
                 if not ERPEmployee.objects.filter(employee_code=code).exists():
                     return code
                 next_num += 1
@@ -1902,10 +1924,9 @@ class ERPSystemLog(models.Model):
 
 import os
 
-
 class ERPSupplier(models.Model):
     id                = models.BigAutoField(primary_key=True)
-    supplier_code     = models.CharField(max_length=50, unique=True)   # e.g. ASLY-0001
+    supplier_code     = models.CharField(max_length=50, unique=True, blank=True)  # blank=True added
     full_name         = models.CharField(max_length=200)
     phone             = models.CharField(max_length=50, blank=True, null=True, default='')
     email             = models.EmailField(max_length=150, blank=True, null=True, default='')
@@ -1918,9 +1939,24 @@ class ERPSupplier(models.Model):
     def __str__(self):
         return f'{self.supplier_code} - {self.full_name}'
 
+    def save(self, *args, **kwargs):
+        if not self.supplier_code:
+            with transaction.atomic():
+                last = ERPSupplier.objects.select_for_update().order_by('-id').first()
+                if last and last.supplier_code:
+                    try:
+                        last_num = int(last.supplier_code.split('-')[-1])
+                    except ValueError:
+                        last_num = 0
+                else:
+                    last_num = 0
+                self.supplier_code = f'ASLY-{str(last_num + 1).zfill(4)}'
+        super().save(*args, **kwargs)
+
 
 class ERPLandOwner(models.Model):
     id                       = models.BigAutoField(primary_key=True)
+    owner_code               = models.CharField(max_length=50, unique=True, blank=True)  # auto-generate
     full_name                = models.CharField(max_length=200)
     nid                      = models.CharField(max_length=50, blank=True, null=True, default='')
     address                  = models.TextField(blank=True, null=True, default='')
@@ -1928,11 +1964,25 @@ class ERPLandOwner(models.Model):
     power_of_attorney_doc    = models.FileField(
         upload_to='erp/land/attorney/', blank=True, null=True
     )
-    created_at= models.DateTimeField(auto_now_add=True)
-    updated_at= models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.full_name
+        return f'{self.owner_code} - {self.full_name}'
+
+    def save(self, *args, **kwargs):
+        if not self.owner_code:
+            with transaction.atomic():
+                last = ERPLandOwner.objects.select_for_update().order_by('-id').first()
+                if last and last.owner_code:
+                    try:
+                        last_num = int(last.owner_code.split('-')[-1])
+                    except ValueError:
+                        last_num = 0
+                else:
+                    last_num = 0
+                self.owner_code = f'ACL-Land-{str(last_num + 1).zfill(4)}'
+        super().save(*args, **kwargs)
 
 
 class ERPLandAcquisition(models.Model):

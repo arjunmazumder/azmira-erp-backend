@@ -333,10 +333,12 @@ class CommissionSerializer(serializers.ModelSerializer):
         
 # ===== 7. BOOKING =====
 
+
 class ERPBookingSerializer(serializers.ModelSerializer):
     final_price = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
     total_paid  = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
     total_due   = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
+    booking_code = serializers.CharField(read_only=True)  # auto-generate, write করা যাবে না
 
     class Meta:
         model  = ERPBooking
@@ -345,14 +347,16 @@ class ERPBookingSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super().to_representation(instance)
 
-        # Customer — user থাকলে full_name, না থাকলে customer_code fallback
+        # Customer
         if instance.customer:
+            representation['customer_code'] = instance.customer.customer_code
             representation['customer'] = (
                 instance.customer.user.full_name
                 if instance.customer.user
                 else instance.customer.customer_code
             )
         else:
+            representation['customer_code'] = None
             representation['customer'] = None
 
         # Plot
@@ -371,7 +375,7 @@ class ERPBookingSerializer(serializers.ModelSerializer):
         else:
             representation['marketing_officer'] = None
 
-        # Transferred To — user থাকলে full_name, না থাকলে customer_code fallback
+        # Transferred To
         if instance.transferred_to:
             representation['transferred_to'] = (
                 instance.transferred_to.user.full_name
@@ -383,7 +387,8 @@ class ERPBookingSerializer(serializers.ModelSerializer):
 
         return representation
     
-    
+
+
 # ===== 8. INSTALLMENT PLAN =====
 
 class ERPInstallmentPlanSerializer(serializers.ModelSerializer):
@@ -673,14 +678,14 @@ class ERPLoanSerializer(serializers.ModelSerializer):
 # ===== 16. INVESTOR =====
 
 class ERPInvestorSerializer(serializers.ModelSerializer):
-    user_name  = serializers.ReadOnlyField(source='user.full_name')
-    user_phone = serializers.ReadOnlyField(source='user.phone')
-    user_email = serializers.ReadOnlyField(source='user.email')
+    user_name     = serializers.ReadOnlyField(source='user.full_name')
+    user_phone    = serializers.ReadOnlyField(source='user.phone')
+    user_email    = serializers.ReadOnlyField(source='user.email')
+    investor_code = serializers.CharField(read_only=True)  
 
     class Meta:
         model  = ERPInvestor
         fields = '__all__'
-
 
 class ERPInvestmentSerializer(serializers.ModelSerializer):
     investor_code  = serializers.ReadOnlyField(source='investor.investor_code')
@@ -1087,12 +1092,15 @@ from mainapp.models import ERPSupplier, ERPLandOwner, ERPLandAcquisition
 
 
 class ERPSupplierSerializer(serializers.ModelSerializer):
+    supplier_code = serializers.CharField(read_only=True)  # auto-generate
+
     class Meta:
         model  = ERPSupplier
         fields = '__all__'
 
-
 class ERPLandOwnerSerializer(serializers.ModelSerializer):
+    owner_code = serializers.CharField(read_only=True)  # auto-generate
+
     class Meta:
         model  = ERPLandOwner
         fields = '__all__'

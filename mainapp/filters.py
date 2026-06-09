@@ -1,7 +1,7 @@
 from django_filters import rest_framework as django_filters
 from rest_framework import viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
-from mainapp.models import Transaction
+from mainapp.models import( Transaction,ERPUser)
 
 class TransactionFilter(django_filters.FilterSet):
     # Exact matches
@@ -40,3 +40,17 @@ class TransactionFilter(django_filters.FilterSet):
             'updated_after', 'updated_before',
             'has_transfer_target', 'has_referral',
         ]
+
+
+
+class ERPUserFilter(django_filters.FilterSet):
+    is_active = django_filters.BooleanFilter(field_name='is_active')
+    role = django_filters.CharFilter(method='filter_by_role')
+
+    def filter_by_role(self, queryset, name, value):
+        # JSONField এ role filter — "marketing_officer" দিলে সেই role আছে এমন user দেখাবে
+        return queryset.filter(roles__contains=value)
+
+    class Meta:
+        model = ERPUser
+        fields = ['is_active', 'role']
