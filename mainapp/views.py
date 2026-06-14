@@ -1074,14 +1074,13 @@ class ERPBookingDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Response(self.get_serializer(booking).data)
 
     def _recalculate_installments(self, booking):
-        unpaid_installments = booking.installment_plan.filter(is_paid=False)
-        count = unpaid_installments.count()
-        if count > 0:
-            per_installment = booking.total_due / count
-            for inst in unpaid_installments:
-                inst.amount = round(per_installment, 2)
-                inst.due_amount = inst.amount - inst.paid_amount
-                inst.save()
+        """
+        Down payment update হলে manually redistribute করো।
+        signals এ booking_id নেই এই path এ, তাই এখানে explicit call।
+        """
+        from mainapp.signals import _redistribute_installments
+        booking.refresh_from_db()
+        _redistribute_installments(booking)
 
 
 class ERPBookingCreateView(generics.CreateAPIView):
@@ -2333,13 +2332,21 @@ class ERPDividendCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
-        investment_id = request.data.get('investment')
-        month         = request.data.get('month')
-        year          = request.data.get('year')
+        investment_id  = request.data.get('investment')
+        month          = request.data.get('month')
+        year           = request.data.get('year')
+        dividend_type  = request.data.get('dividend_type', 'monthly')
 
         if not all([investment_id, month, year]):
             return Response(
                 {'error': 'investment, month এবং year আবশ্যক।'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # yearly হলে month অবশ্যই 12 হতে হবে
+        if dividend_type == 'yearly' and int(month) != 12:
+            return Response(
+                {'error': 'Yearly dividend শুধুমাত্র ডিসেম্বর (month=12) মাসে দেওয়া যাবে।'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -2357,26 +2364,32 @@ class ERPDividendCreateView(generics.CreateAPIView):
 
             # ── Duplicate চেক ──
             if ERPDividend.objects.filter(
-                investment=investment,
-                month=month,
-                year=year
+                investment    = investment,
+                month         = month,
+                year          = year,
+                dividend_type = dividend_type,  # ← নতুন
             ).exists():
                 return Response(
-                    {'error': f'{month}/{year} মাসের dividend ইতিমধ্যে দেওয়া হয়েছে।'},
+                    {'error': f'{month}/{year} মাসের {dividend_type} dividend ইতিমধ্যে দেওয়া হয়েছে।'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
             # ── Calculate ──
-            base_amount     = Decimal(str(investment.invest_amount))
-            rate_percent    = Decimal(str(investment.monthly_dividend_rate))
+            base_amount = Decimal(str(investment.invest_amount))
+
+            if dividend_type == 'monthly':
+                rate_percent    = Decimal(str(investment.monthly_dividend_rate))
+            else:  # yearly
+                rate_percent    = Decimal(str(investment.yearly_dividend_rate))
+
             dividend_amount = (base_amount * rate_percent / Decimal('100')).quantize(
                 Decimal('0.00'), rounding=ROUND_HALF_UP
             )
 
             with transaction.atomic():
                 wallet = ERPWallet.objects.select_for_update().get(
-                    user=investment.investor.user,
-                    wallet_type='investor'
+                    user        = investment.investor.user,
+                    wallet_type = 'investor'
                 )
 
                 dividend = ERPDividend.objects.create(
@@ -2387,6 +2400,7 @@ class ERPDividendCreateView(generics.CreateAPIView):
                     base_amount        = base_amount,
                     dividend_rate      = rate_percent,
                     dividend_amount    = dividend_amount,
+                    dividend_type      = dividend_type,  # ← নতুন
                     status             = 'paid',
                     wallet_credited    = True,
                     wallet_credited_at = tz.now(),

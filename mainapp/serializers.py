@@ -719,8 +719,9 @@ class ERPInvestmentSerializer(serializers.ModelSerializer):
 class ERPDividendSerializer(serializers.ModelSerializer):
     investor_code  = serializers.ReadOnlyField(source='investor.investor_code')
     investor_name  = serializers.SerializerMethodField()
-    investment_id  = serializers.ReadOnlyField(source='investment.investment_id')
+    investment_code = serializers.ReadOnlyField(source='investment.investment_id')  # ← fix
     status_display = serializers.SerializerMethodField()
+    dividend_type_display = serializers.SerializerMethodField()  # ← নতুন
 
     class Meta:
         model  = ERPDividend
@@ -731,6 +732,9 @@ class ERPDividendSerializer(serializers.ModelSerializer):
 
     def get_status_display(self, obj):
         return obj.get_status_display()
+
+    def get_dividend_type_display(self, obj):   # ← নতুন
+        return obj.get_dividend_type_display()
 
 
 class LandPowerAssignmentSerializer(serializers.ModelSerializer):

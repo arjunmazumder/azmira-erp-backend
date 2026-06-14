@@ -829,16 +829,12 @@ class ERPInstallmentPlan(models.Model):
 
   # 🔥 Save override (Safe calculation & Auto-update Booking)
     def save(self, *args, **kwargs):
-        # ১. কিস্তির নিজস্ব ডিউ এবং পেইড স্ট্যাটাস আপডেট
+        # নিজস্ব due ও paid status
         self.due_amount = (self.amount or 0) - (self.paid_amount or 0)
         self.is_paid = self.paid_amount >= self.amount
-        
-        # ২. কিস্তি সেভ (এটি ডাটাবেসে ডাটা পাঠাবে)
+
         super().save(*args, **kwargs)
 
-        # ৩. মেইন বুকিং আপডেট (বুকিং এর save মেথড কল হবে এবং সব হিসাব নতুন করে হবে)
-        if self.booking:
-            self.booking.save()
 
  
 # =====================================================
@@ -1340,6 +1336,7 @@ class ERPInvestment(models.Model):
     invest_date = models.DateField(default=date.today)
     maturity_date = models.DateField(blank=True, null=True)
     monthly_dividend_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    yearly_dividend_rate  = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     total_profit_received = models.DecimalField(max_digits=16, decimal_places=2, default=0)
     agreement_number = models.CharField(max_length=100, blank=True, null=True, default='')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
@@ -1395,27 +1392,34 @@ class ERPDividend(models.Model):
         ('pending_withdrawal', 'Pending Withdrawal'),
     ]
 
-    id = models.BigAutoField(primary_key=True)
-    investment = models.ForeignKey(ERPInvestment, on_delete=models.CASCADE, related_name='dividends')
-    investor = models.ForeignKey(ERPInvestor, on_delete=models.CASCADE, related_name='dividends')
-    month = models.IntegerField()
-    year = models.IntegerField()
-    base_amount = models.DecimalField(max_digits=16, decimal_places=2)
-    dividend_rate = models.DecimalField(max_digits=5, decimal_places=2)
-    dividend_amount = models.DecimalField(max_digits=12, decimal_places=2)
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='generated')
-    wallet_credited = models.BooleanField(default=True)
-    wallet_credited_at = models.DateTimeField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    DIVIDEND_TYPE_CHOICES = [
+        ('monthly', 'Monthly'),
+        ('yearly', 'Yearly'),   
+    ]
+
+    id                      = models.BigAutoField(primary_key=True)
+    investment              = models.ForeignKey(ERPInvestment, on_delete=models.CASCADE, related_name='dividends')
+    investor                = models.ForeignKey(ERPInvestor, on_delete=models.CASCADE, related_name='dividends')
+    month                   = models.IntegerField(blank=True, null=True)
+    year                    = models.IntegerField(blank=True, null=True)
+    base_amount             = models.DecimalField(max_digits=16, decimal_places=2)
+    dividend_rate           = models.DecimalField(max_digits=5, decimal_places=2)
+    dividend_amount         = models.DecimalField(max_digits=12, decimal_places=2)
+    dividend_type           = models.CharField(max_length=10, choices=DIVIDEND_TYPE_CHOICES, default='monthly')  # ← নতুন
+    status                  = models.CharField(max_length=30, choices=STATUS_CHOICES, default='generated')
+    wallet_credited         = models.BooleanField(default=True)
+    wallet_credited_at      = models.DateTimeField(blank=True, null=True)
+    created_at              = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = [['investment', 'month', 'year']]
-        ordering = ['-year', '-month']
+        unique_together = [['investment', 'year', 'dividend_type']] 
+        ordering        = ['-id']
 
     def __str__(self):
-        return f'Dividend - {self.investor.investor_code} - {self.month}/{self.year}'
+        return f'Dividend - {self.investor.investor_code} - {self.month}/{self.year} ({self.dividend_type})'
 
 
+        
 
 class LandPowerAssignment(models.Model):
     TRANSFER_STATUS = [

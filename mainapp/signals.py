@@ -1,5 +1,13 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+from decimal import Decimal, ROUND_HALF_UP
+from django.db.models import Sum
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+
+from mainapp.models import Transaction
+from mainapp.generate_commission import create_commission_table
+
 
 print("✅ signals.py loaded!")
 
@@ -273,49 +281,116 @@ def customer_post_delete(sender, instance, **kwargs):
 # TRANSACTION SIGNALS
 # =====================================================
 
-from decimal import Decimal
-from django.db.models import Sum
-from django.db.models.signals import post_save, post_delete
-from django.dispatch import receiver
-
-from mainapp.models import Transaction
-from mainapp.generate_commission import create_commission_table
 
 
-def _refresh_booking_totals(booking):
-    transaction_total = booking.transactions.aggregate(
-        total=Sum('amount')
-    )['total'] or 0
-
-    print(f"DEBUG total from DB: {transaction_total}")  # ← এই লাইন যোগ করুন
-
-    booking.total_paid = Decimal(transaction_total)
-    booking.total_due  = booking.final_price - booking.total_paid
-
-    booking.save(update_fields=['total_paid', 'total_due', 'updated_at'])
-    print(f"DEBUG after save: {booking.total_paid}, {booking.total_due}")  # ← এটাও
 
 
-@receiver(post_save, sender=Transaction)
+def _refresh_booking_totals(booking_id: int):
+    """
+    Transaction table থেকে aggregate করে booking এর
+    total_paid এবং total_due update করে।
+    booking.save() কল করা হয় না — QuerySet.update() ব্যবহার।
+    """
+    try:
+        booking = ERPBooking.objects.get(pk=booking_id)
+    except ERPBooking.DoesNotExist:
+        return
+
+    agg = booking.transactions.aggregate(total=Sum('amount'))
+    total_paid = Decimal(str(agg['total'] or 0))
+    total_due  = booking.final_price - total_paid
+
+    # booking.save() নয় — signal loop এড়ানোর জন্য
+    ERPBooking.objects.filter(pk=booking_id).update(
+        total_paid=total_paid,
+        total_due=total_due,
+    )
+
+    # booking object refresh করে installment redistribute
+    booking.refresh_from_db()
+    _redistribute_installments(booking)
+
+
+
+
+def _redistribute_installments(booking):
+    """
+    Booking এর current total_due কে unpaid installments এ
+    সমানভাবে ভাগ করে।
+    - শেষ installment এ rounding error absorb হবে।
+    - QuerySet.update() ব্যবহার — কোনো save() loop নেই।
+    """
+    unpaid_qs = ERPInstallmentPlan.objects.filter(
+        booking=booking,
+        is_paid=False,
+    )
+    count = unpaid_qs.count()
+
+    if count == 0:
+        return
+
+    total_due = booking.total_due
+
+    if total_due <= 0:
+        # সব paid হয়ে গেছে — due 0 করে দাও
+        unpaid_qs.update(amount=0, due_amount=0)
+        return
+
+    # প্রতিটা installment এ সমান ভাগ
+    per_inst = (total_due / count).quantize(
+        Decimal('0.01'), rounding=ROUND_HALF_UP
+    )
+
+    # সব unpaid installment একসাথে update
+    # শেষটা আলাদা করতে হবে rounding fix এর জন্য
+    unpaid_ids = list(unpaid_qs.order_by('installment_number').values_list('id', flat=True))
+
+    if not unpaid_ids:
+        return
+
+    # শেষেরটা বাদ দিয়ে বাকিগুলো update
+    non_last_ids = unpaid_ids[:-1]
+    last_id      = unpaid_ids[-1]
+
+    if non_last_ids:
+        ERPInstallmentPlan.objects.filter(id__in=non_last_ids).update(
+            amount=per_inst,
+            due_amount=per_inst,  # unpaid তাই paid_amount=0 ধরা হচ্ছে
+        )
+
+    # শেষ installment এ বাকি সব (rounding difference absorb)
+    already_allocated = per_inst * len(non_last_ids)
+    last_amount = total_due - already_allocated
+
+    ERPInstallmentPlan.objects.filter(id=last_id).update(
+        amount=last_amount,
+        due_amount=last_amount,
+    )
+
+
+
+@receiver(post_save, sender=Transaction, weak=False)
 def on_transaction_saved(sender, instance, created, **kwargs):
-    print("🔥 TRANSACTION SIGNAL RUNNING")
-
+    """
+    Transaction save হলে:
+    1. নতুন হলে commission তৈরি
+    2. Booking এর total_paid/due refresh
+    3. Unpaid installments redistribute
+    """
     if created:
-        print(f"Transaction ID: {instance.pk}")
         create_commission_table(instance.pk)
 
-    print(f"DEBUG booking_id: {instance.booking_id}")  # ← এই লাইন যোগ করুন
-
     if instance.booking_id:
-        print("DEBUG: calling _refresh_booking_totals")  # ← এটাও
-        _refresh_booking_totals(instance.booking)
+        _refresh_booking_totals(instance.booking_id)
 
 
-@receiver(post_delete, sender=Transaction)
+@receiver(post_delete, sender=Transaction, weak=False)
 def on_transaction_deleted(sender, instance, **kwargs):
-    """Transaction delete হলেও booking update হবে"""
+    """
+    Transaction delete হলেও booking ও installment update হবে।
+    """
     if instance.booking_id:
-        _refresh_booking_totals(instance.booking)
+        _refresh_booking_totals(instance.booking_id)
 
 
 
