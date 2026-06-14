@@ -114,7 +114,7 @@ class ERPUser(AbstractBaseUser, PermissionsMixin):
     objects = ERPUserManager()
     referred_by = models.ForeignKey('self',on_delete=models.SET_NULL,null=True, blank=True,related_name='referred_users')
     USERNAME_FIELD = 'username'
-    REQUIRED_FIELDS = ['email','full_name','phone','nid']
+    REQUIRED_FIELDS = ['email','full_name','phone','nid','referred_by']
 
     class Meta:
         ordering = ['-created_at']
@@ -1077,7 +1077,7 @@ class ERPMarketingOfficer(models.Model):
         # ✅ officer_code auto generate
         if not self.officer_code:
             last = ERPMarketingOfficer.objects.order_by('-id').first()
-            if last and last.officer_code.startswith('OFF-'):
+            if last and last.officer_code.startswith('ACLM-'):
                 last_number = int(last.officer_code.split('-')[1])
                 self.officer_code = f'OFF-{str(last_number + 1).zfill(4)}'
             else:
