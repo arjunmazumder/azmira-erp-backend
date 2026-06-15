@@ -111,6 +111,10 @@ class ERPUserCreateSerializer(serializers.ModelSerializer):
             'is_investor',
             'is_marketing',
         ]
+        extra_kwargs = {
+            'referred_by': {'required': True, 'allow_null': False},
+        }
+
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)

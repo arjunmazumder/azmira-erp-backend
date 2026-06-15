@@ -458,7 +458,8 @@ class ERPUserByRoleView(generics.ListAPIView):
     serializer_class = ERPUserListSerializer
 
     def get_queryset(self):
-        return ERPUser.objects.filter(roles__contains=[self.kwargs['role']], is_active=True)
+        role = self.kwargs.get('role', '')
+        return ERPUser.objects.filter(roles__icontains=f'"{role}"', is_active=True)
 
 # =====================================================
 # 2. PROJECT VIEWS

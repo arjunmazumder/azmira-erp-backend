@@ -49,7 +49,7 @@ class ERPUserFilter(django_filters.FilterSet):
 
     def filter_by_role(self, queryset, name, value):
         # JSONField এ role filter — "marketing_officer" দিলে সেই role আছে এমন user দেখাবে
-        return queryset.filter(roles__contains=value)
+        return queryset.filter(roles__icontains=f'"{value}"')
 
     class Meta:
         model = ERPUser

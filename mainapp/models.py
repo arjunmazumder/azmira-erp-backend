@@ -114,7 +114,7 @@ class ERPUser(AbstractBaseUser, PermissionsMixin):
     objects = ERPUserManager()
     referred_by = models.ForeignKey('self',on_delete=models.SET_NULL,null=True, blank=True,related_name='referred_users')
     USERNAME_FIELD = 'username'
-    REQUIRED_FIELDS = ['email','full_name','phone','nid','referred_by']
+    REQUIRED_FIELDS = ['email','full_name','phone','nid']
 
     class Meta:
         ordering = ['-created_at']
