@@ -9,7 +9,7 @@ from mainapp.models import Transaction
 from mainapp.generate_commission import create_commission_table
 
 
-print("✅ signals.py loaded!")
+print("signals.py loaded!")
 
 
 # =====================================================
@@ -369,7 +369,7 @@ def _redistribute_installments(booking):
 
 
 
-@receiver(post_save, sender=Transaction, weak=False)
+@receiver(post_save, sender=Transaction, weak=False, dispatch_uid="on_transaction_saved")
 def on_transaction_saved(sender, instance, created, **kwargs):
     """
     Transaction save হলে:
@@ -384,7 +384,7 @@ def on_transaction_saved(sender, instance, created, **kwargs):
         _refresh_booking_totals(instance.booking_id)
 
 
-@receiver(post_delete, sender=Transaction, weak=False)
+@receiver(post_delete, sender=Transaction, weak=False, dispatch_uid="on_transaction_deleted")
 def on_transaction_deleted(sender, instance, **kwargs):
     """
     Transaction delete হলেও booking ও installment update হবে।
@@ -463,7 +463,7 @@ def _make_handlers(model):
     model_name = model.__name__
     label, module = MODEL_MODULE_MAP.get(model_name, (model_name, 'SYSTEM'))
 
-    @receiver(post_save, sender=model, weak=False)
+    @receiver(post_save, sender=model, weak=False, dispatch_uid=f"log_save_{model.__name__}")
     def on_save(sender, instance, created, **kwargs):
         action = f'{label} {"Created" if created else "Updated"}'
         create_log(
@@ -473,7 +473,7 @@ def _make_handlers(model):
             log_level='info',
         )
 
-    @receiver(post_delete, sender=model, weak=False)
+    @receiver(post_delete, sender=model, weak=False, dispatch_uid=f"log_delete_{model.__name__}")
     def on_delete(sender, instance, **kwargs):
         create_log(
             action=f'{label} Deleted',
@@ -488,18 +488,12 @@ for _model in TRACKED_MODELS:
     _make_handlers(_model)
 
 
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-from .models import Transaction, ERPMoneyReceipt
+from django.db import transaction
 
-@receiver(post_save, sender=Transaction)
+@receiver(post_save, sender=Transaction, dispatch_uid="create_receipt_from_transaction")
 def create_receipt_from_transaction(sender, instance, created, **kwargs):
     if not created:
         return
-
-    # ✅ এই check টা সরানো হয়েছে
-    # if not instance.booking or not instance.customer:
-    #     return
 
     RECEIPT_TYPE_MAP = {
         'booking_money': 'token',
@@ -511,26 +505,84 @@ def create_receipt_from_transaction(sender, instance, created, **kwargs):
     }
     receipt_type = RECEIPT_TYPE_MAP.get(instance.transaction_type, 'other')
 
-    while True:
-        last = ERPMoneyReceipt.objects.order_by('-id').first()
-        if last and last.receipt_number.startswith('RCP-'):
-            last_number    = int(last.receipt_number.split('-')[1])
+    with transaction.atomic():
+        last = ERPMoneyReceipt.objects.filter(receipt_number__startswith='RCP-').select_for_update().order_by('-id').first()
+        if last:
+            try:
+                last_number    = int(last.receipt_number.split('-')[1])
+            except ValueError:
+                last_number = 0
             receipt_number = f'RCP-{str(last_number + 1).zfill(4)}'
         else:
             receipt_number = 'RCP-0001'
 
-        if not ERPMoneyReceipt.objects.filter(receipt_number=receipt_number).exists():
-            break
+        ERPMoneyReceipt.objects.create(
+            receipt_number = receipt_number,
+            booking        = instance.booking,    # None হলেও চলবে
+            customer       = instance.customer,   # None হলেও চলবে
+            user           = instance.user, 
+            receipt_type   = receipt_type,
+            amount         = instance.amount,
+            payment_date   = instance.created_at.date(),
+            payment_mode   = 'cash',
+            status         = 'pending',
+            notes          = instance.notes or '',
+        )
 
-    ERPMoneyReceipt.objects.create(
-        receipt_number = receipt_number,
-        booking        = instance.booking,    # None হলেও চলবে
-        customer       = instance.customer,   # None হলেও চলবে
-        user           = instance.user, 
-        receipt_type   = receipt_type,
-        amount         = instance.amount,
-        payment_date   = instance.created_at.date(),
-        payment_mode   = 'cash',
-        status         = 'pending',
-        notes          = instance.notes or '',
-    )
+
+@receiver(post_save, sender=ERPMoneyReceipt, dispatch_uid="auto_create_voucher_for_receipt")
+def auto_create_voucher_for_receipt(sender, instance, created, **kwargs):
+    """
+    Automatically create a draft ERPVoucher when an ERPMoneyReceipt is generated.
+    """
+    if created:
+        with transaction.atomic():
+            last = ERPVoucher.objects.filter(voucher_number__startswith='VCH-').select_for_update().order_by('-id').first()
+            if last:
+                try:
+                    last_number = int(last.voucher_number.split('-')[1])
+                except ValueError:
+                    last_number = 0
+                voucher_number = f'VCH-{str(last_number + 1).zfill(4)}'
+            else:
+                voucher_number = 'VCH-0001'
+
+            ERPVoucher.objects.create(
+                voucher_number=voucher_number,
+                voucher_type='credit',
+                voucher_date=instance.payment_date,
+                entry_date=instance.entry_date,
+                amount=instance.amount,
+                description=f"Auto-generated draft voucher for Receipt #{instance.receipt_number}",
+                booking=instance.booking,
+                customer=instance.customer,
+                status='draft'
+            )
+
+
+@receiver(post_save, sender=ERPWalletTransaction, dispatch_uid="update_wallet_balance")
+def update_wallet_balance(sender, instance, created, **kwargs):
+    """
+    Safely update ERPWallet.balance when ERPWalletTransaction is approved or paid.
+    Uses select_for_update() to prevent race conditions.
+    """
+    if instance.status in ['approved', 'paid'] and instance.amount != 0:
+        # Prevent applying the same transaction multiple times
+        if instance.balance_before == 0 and instance.balance_after == 0:
+            with transaction.atomic():
+                wallet = ERPWallet.objects.select_for_update().get(pk=instance.wallet_id)
+                
+                balance_before = wallet.balance
+                if getattr(instance, 'transaction_direction', 'in') == 'in':
+                    wallet.balance += instance.amount
+                else:
+                    wallet.balance -= instance.amount
+                
+                balance_after = wallet.balance
+                wallet.save(update_fields=['balance'])
+                
+                # Update the transaction record with the captured balances
+                ERPWalletTransaction.objects.filter(pk=instance.pk).update(
+                    balance_before=balance_before,
+                    balance_after=balance_after
+                )

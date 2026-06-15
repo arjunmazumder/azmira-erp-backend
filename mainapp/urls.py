@@ -136,6 +136,8 @@ from mainapp.views import (
     ERPAccountHeadListView,
     ERPAccountHeadDetailView,
     ERPAccountHeadCreateView,
+    IncomeStatementView,
+    BalanceSheetView,
 
     # 20. Offer
     ERPOfferListView,
@@ -400,6 +402,10 @@ urlpatterns = [
     path('erp-account-heads/', ERPAccountHeadListView.as_view(), name='erp-account-head-list'),
     path('erp-account-heads/<int:pk>/', ERPAccountHeadDetailView.as_view(), name='erp-account-head-detail'),
     path('erp-account-heads/new/', ERPAccountHeadCreateView.as_view(), name='erp-account-head-create'),
+
+    # Financial Reports
+    path('erp-reports/income-statement/', IncomeStatementView.as_view(), name='erp-income-statement'),
+    path('erp-reports/balance-sheet/', BalanceSheetView.as_view(), name='erp-balance-sheet'),
 
     # =====================================================
     # 20. OFFER PORTAL

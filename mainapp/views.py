@@ -3298,6 +3298,172 @@ class PercentageViewSet(viewsets.ModelViewSet):
             )
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+
+# =====================================================
+# FINANCIAL REPORTS (Income Statement & Balance Sheet)
+# =====================================================
+
+def get_account_balance(account, start_date=None, end_date=None, for_period_only=False):
+    """
+    Calculates the balance of an ERPAccountHead.
+    For Asset/Expense: Balance = Opening + Debit - Credit
+    For Liability/Equity/Income: Balance = Opening + Credit - Debit
     
+    If for_period_only is True (usually for Income/Expense in a specific period),
+    it ignores the opening balance and transactions before start_date.
+    """
+    opening = account.opening_balance if not for_period_only else Decimal(0)
+    
+    debit_qs = ERPVoucher.objects.filter(debit_head=account, status='approved')
+    credit_qs = ERPVoucher.objects.filter(credit_head=account, status='approved')
+    
+    if start_date:
+        if for_period_only:
+            debit_qs = debit_qs.filter(voucher_date__gte=start_date)
+            credit_qs = credit_qs.filter(voucher_date__gte=start_date)
+            
+    if end_date:
+        debit_qs = debit_qs.filter(voucher_date__lte=end_date)
+        credit_qs = credit_qs.filter(voucher_date__lte=end_date)
+        
+    total_debit = debit_qs.aggregate(total=Sum('amount'))['total'] or Decimal(0)
+    total_credit = credit_qs.aggregate(total=Sum('amount'))['total'] or Decimal(0)
+    
+    if account.account_type in ['asset', 'expense']:
+        return opening + total_debit - total_credit
+    else:
+        # liability, equity, income
+        return opening + total_credit - total_debit
 
 
+class IncomeStatementView(APIView):
+    # permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        incomes = []
+        expenses = []
+        total_income = Decimal(0)
+        total_expense = Decimal(0)
+        
+        income_heads = ERPAccountHead.objects.filter(account_type='income', is_active=True)
+        for head in income_heads:
+            balance = get_account_balance(head, start_date, end_date, for_period_only=bool(start_date))
+            if balance != 0 or not start_date:
+                incomes.append({
+                    'account_code': head.account_code,
+                    'account_name': head.account_name,
+                    'balance': balance
+                })
+                total_income += balance
+                
+        expense_heads = ERPAccountHead.objects.filter(account_type='expense', is_active=True)
+        for head in expense_heads:
+            balance = get_account_balance(head, start_date, end_date, for_period_only=bool(start_date))
+            if balance != 0 or not start_date:
+                expenses.append({
+                    'account_code': head.account_code,
+                    'account_name': head.account_name,
+                    'balance': balance
+                })
+                total_expense += balance
+                
+        net_income = total_income - total_expense
+        
+        return Response({
+            'success': True,
+            'data': {
+                'start_date': start_date,
+                'end_date': end_date,
+                'incomes': incomes,
+                'total_income': total_income,
+                'expenses': expenses,
+                'total_expense': total_expense,
+                'net_income': net_income
+            }
+        })
+
+
+class BalanceSheetView(APIView):
+    # permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        end_date = request.query_params.get('end_date')
+        
+        assets = []
+        liabilities = []
+        equities = []
+        
+        total_asset = Decimal(0)
+        total_liability = Decimal(0)
+        total_equity = Decimal(0)
+        
+        asset_heads = ERPAccountHead.objects.filter(account_type='asset', is_active=True)
+        for head in asset_heads:
+            balance = get_account_balance(head, end_date=end_date, for_period_only=False)
+            if balance != 0:
+                assets.append({
+                    'account_code': head.account_code,
+                    'account_name': head.account_name,
+                    'balance': balance
+                })
+                total_asset += balance
+                
+        liability_heads = ERPAccountHead.objects.filter(account_type='liability', is_active=True)
+        for head in liability_heads:
+            balance = get_account_balance(head, end_date=end_date, for_period_only=False)
+            if balance != 0:
+                liabilities.append({
+                    'account_code': head.account_code,
+                    'account_name': head.account_name,
+                    'balance': balance
+                })
+                total_liability += balance
+                
+        equity_heads = ERPAccountHead.objects.filter(account_type='equity', is_active=True)
+        for head in equity_heads:
+            balance = get_account_balance(head, end_date=end_date, for_period_only=False)
+            if balance != 0:
+                equities.append({
+                    'account_code': head.account_code,
+                    'account_name': head.account_name,
+                    'balance': balance
+                })
+                total_equity += balance
+                
+        # Calculate Retained Earnings (Net Income)
+        total_income = Decimal(0)
+        total_expense = Decimal(0)
+        
+        for head in ERPAccountHead.objects.filter(account_type='income', is_active=True):
+            total_income += get_account_balance(head, end_date=end_date, for_period_only=False)
+            
+        for head in ERPAccountHead.objects.filter(account_type='expense', is_active=True):
+            total_expense += get_account_balance(head, end_date=end_date, for_period_only=False)
+            
+        net_income = total_income - total_expense
+        
+        equities.append({
+            'account_code': 'RE-0000',
+            'account_name': 'Retained Earnings (Net Income)',
+            'balance': net_income
+        })
+        total_equity += net_income
+        
+        return Response({
+            'success': True,
+            'data': {
+                'as_of_date': end_date,
+                'assets': assets,
+                'total_asset': total_asset,
+                'liabilities': liabilities,
+                'total_liability': total_liability,
+                'equities': equities,
+                'total_equity': total_equity,
+                'total_liability_and_equity': total_liability + total_equity,
+                'is_balanced': total_asset == (total_liability + total_equity)
+            }
+        })

@@ -528,7 +528,13 @@ class Transaction(models.Model):
         ('others', 'Others'),
     ]
 
+    TRANSACTION_DIRECTION_CHOICES = [
+        ('in', 'Inflow'),
+        ('out', 'Outflow'),
+    ]
+
     id               = models.BigAutoField(primary_key=True)
+    transaction_direction = models.CharField(max_length=10, choices=TRANSACTION_DIRECTION_CHOICES, default='in')
     transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPE, default='booking_money')
     booking          = models.ForeignKey(
         'ERPBooking', on_delete=models.CASCADE,
@@ -641,20 +647,21 @@ def generate_booking_code(project):
     words = project.project_name.split()
     prefix = ''.join(word[0].upper() for word in words if word)
 
-    last = ERPBooking.objects.filter(
-        booking_code__startswith=prefix
-    ).order_by('-booking_code').first()
+    with transaction.atomic():
+        last = ERPBooking.objects.select_for_update().filter(
+            booking_code__startswith=prefix
+        ).order_by('-booking_code').first()
 
-    if last:
-        try:
-            last_num = int(last.booking_code.split('-')[-1])
-        except ValueError:
+        if last:
+            try:
+                last_num = int(last.booking_code.split('-')[-1])
+            except ValueError:
+                last_num = 0
+        else:
             last_num = 0
-    else:
-        last_num = 0
 
-    new_num = last_num + 1
-    return f"{prefix}-{str(new_num).zfill(4)}"
+        new_num = last_num + 1
+        return f"{prefix}-{str(new_num).zfill(4)}"
 
 
 class ERPBooking(models.Model):
@@ -1076,12 +1083,15 @@ class ERPMarketingOfficer(models.Model):
     def save(self, *args, **kwargs):
         # ✅ officer_code auto generate
         if not self.officer_code:
-            last = ERPMarketingOfficer.objects.order_by('-id').first()
-            if last and last.officer_code.startswith('ACLM-'):
-                last_number = int(last.officer_code.split('-')[1])
-                self.officer_code = f'OFF-{str(last_number + 1).zfill(4)}'
+            last = ERPMarketingOfficer.objects.filter(officer_code__startswith='ACLM-').order_by('-id').first()
+            if last:
+                try:
+                    last_number = int(last.officer_code.split('-')[1])
+                except ValueError:
+                    last_number = 0
+                self.officer_code = f'ACLM-{str(last_number + 1).zfill(4)}'
             else:
-                self.officer_code = 'OFF-0001'
+                self.officer_code = 'ACLM-0001'
         super().save(*args, **kwargs)
 
         
@@ -1135,7 +1145,13 @@ class ERPWalletTransaction(models.Model):
         ('paid', 'Paid'),
     ]
 
+    TRANSACTION_DIRECTION_CHOICES = [
+        ('in', 'Inflow'),
+        ('out', 'Outflow'),
+    ]
+
     id = models.BigAutoField(primary_key=True)
+    transaction_direction = models.CharField(max_length=10, choices=TRANSACTION_DIRECTION_CHOICES, default='in')
     wallet = models.ForeignKey(ERPWallet, on_delete=models.CASCADE, related_name='transactions')
     transaction_type = models.CharField(max_length=30, choices=TRANSACTION_TYPE_CHOICES)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
