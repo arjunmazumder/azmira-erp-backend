@@ -542,8 +542,8 @@ class Transaction(models.Model):
     )
     customer         = models.ForeignKey(ERPCustomer, on_delete=models.CASCADE, related_name='customer_transactions', null=True, blank=True,)
     user             = models.ForeignKey(ERPUser, null=True, blank=True, on_delete=models.SET_NULL, related_name='user_transactions')
-    project          = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='project_transactions')
-    plot             = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='plot_transactions')
+    project          = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='project_transactions', null=True, blank=True)
+    plot             = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='plot_transactions', null=True, blank=True)
     referred_by      = models.ForeignKey(
         ERPUser, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='referred_transactions'

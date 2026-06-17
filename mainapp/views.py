@@ -19,6 +19,8 @@ from rest_framework.generics import ListAPIView
 from django.db.models import Sum, Count, Q, Avg, F
 from django.db import models 
 
+from .utils.accounting import create_transaction_and_voucher, update_account_balances
+
 from mainapp.models import (
     ERPUser,
     Project,
@@ -330,9 +332,17 @@ def erp_user_login(request):
         }, status=status.HTTP_400_BAD_REQUEST)
 
     # =====================================================
-    # Authentication
+    # Authentication (Case-Insensitive Username)
     # =====================================================
-    user = authenticate(username=username, password=password)
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    
+    try:
+        user_obj = User.objects.get(username__iexact=username)
+        # Authenticate with the exact case matched username
+        user = authenticate(username=user_obj.username, password=password)
+    except (User.DoesNotExist, User.MultipleObjectsReturned):
+        user = authenticate(username=username, password=password)
 
     if user is not None:
         if user.is_active:
@@ -1249,26 +1259,29 @@ class ERPMoneyReceiptDetailView(generics.RetrieveUpdateDestroyAPIView):
             instance.authorized_at = datetime.now()
             instance.e_sign = True
             instance.e_sign_date = datetime.now()
-            self._update_booking_payment(instance)
+            
+            # Create Transaction and Voucher for Income
+            try:
+                create_transaction_and_voucher(
+                    direction='in',
+                    transaction_type=instance.receipt_type,
+                    amount=instance.amount,
+                    user=instance.user,
+                    customer=instance.customer,
+                    booking=instance.booking,
+                    project=instance.booking.project if instance.booking else None,
+                    plot=instance.booking.plot if instance.booking else None,
+                    description=f'Money Receipt #{instance.receipt_number} authorized.',
+                    create_txn=False
+                )
+            except Exception as e:
+                print('Accounting Automation Error:', e)
 
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(self.get_serializer(instance).data)
 
-    def _update_booking_payment(self, receipt):
-        """When receipt is authorized, update booking total_paid."""
-        booking = receipt.booking
-        booking.total_paid += receipt.amount
-        booking.total_due = booking.final_price - booking.total_paid
-        booking.save()
-        if receipt.installment:
-            inst = receipt.installment
-            inst.paid_amount += receipt.amount
-            inst.due_amount = inst.amount - inst.paid_amount
-            if inst.paid_amount >= inst.amount:
-                inst.is_paid = True
-            inst.save()
 
 
 class ERPMoneyReceiptCreateView(generics.CreateAPIView):
@@ -1376,7 +1389,9 @@ class ERPVoucherCreateView(generics.CreateAPIView):
             voucher_number__startswith=f'VCH-{year}-'
         ).count()
         voucher_number = f'VCH-{year}-{str(last + 1).zfill(4)}'
-        serializer.save(voucher_number=voucher_number)
+        voucher = serializer.save(voucher_number=voucher_number)
+        if voucher.status == 'approved':
+            update_account_balances(voucher)
 
 
 # ✅ Approve / Reject এর আলাদা endpoint
@@ -1400,6 +1415,9 @@ class ERPVoucherApproveView(generics.UpdateAPIView):
         voucher.approved_by_id = request.data.get('approved_by')
         voucher.approved_at = date.today()
         voucher.save()
+
+        # Update Account Balances
+        update_account_balances(voucher)
 
         return Response(
             ERPVoucherSerializer(voucher).data,
@@ -2811,6 +2829,19 @@ class ERPOfficerRequestDetailView(generics.RetrieveUpdateDestroyAPIView):
             instance.approved_by = request.data.get('approved_by', '')
             instance.approved_at = datetime.now()
             instance.save()
+        elif request.data.get('status') == 'paid' and instance.status != 'paid':
+            # Create Transaction and Voucher for Expense
+            try:
+                create_transaction_and_voucher(
+                    direction='out',
+                    transaction_type=instance.request_type,
+                    amount=instance.amount,
+                    user=instance.officer.user if instance.officer else None,
+                    description=f'Officer Request ({instance.request_type}) paid.'
+                )
+            except Exception as e:
+                print('Accounting Automation Error:', e)
+        
         serializer.save()
         return Response(self.get_serializer(instance).data)
 

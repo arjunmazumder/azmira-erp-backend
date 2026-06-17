@@ -495,6 +495,9 @@ def create_receipt_from_transaction(sender, instance, created, **kwargs):
     if not created:
         return
 
+    if instance.transaction_direction == 'out':
+        return
+
     RECEIPT_TYPE_MAP = {
         'booking_money': 'token',
         'token_money':   'token',
@@ -530,34 +533,7 @@ def create_receipt_from_transaction(sender, instance, created, **kwargs):
         )
 
 
-@receiver(post_save, sender=ERPMoneyReceipt, dispatch_uid="auto_create_voucher_for_receipt")
-def auto_create_voucher_for_receipt(sender, instance, created, **kwargs):
-    """
-    Automatically create a draft ERPVoucher when an ERPMoneyReceipt is generated.
-    """
-    if created:
-        with transaction.atomic():
-            last = ERPVoucher.objects.filter(voucher_number__startswith='VCH-').select_for_update().order_by('-id').first()
-            if last:
-                try:
-                    last_number = int(last.voucher_number.split('-')[1])
-                except ValueError:
-                    last_number = 0
-                voucher_number = f'VCH-{str(last_number + 1).zfill(4)}'
-            else:
-                voucher_number = 'VCH-0001'
 
-            ERPVoucher.objects.create(
-                voucher_number=voucher_number,
-                voucher_type='credit',
-                voucher_date=instance.payment_date,
-                entry_date=instance.entry_date,
-                amount=instance.amount,
-                description=f"Auto-generated draft voucher for Receipt #{instance.receipt_number}",
-                booking=instance.booking,
-                customer=instance.customer,
-                status='draft'
-            )
 
 
 @receiver(post_save, sender=ERPWalletTransaction, dispatch_uid="update_wallet_balance")
