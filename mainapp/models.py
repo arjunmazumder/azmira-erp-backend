@@ -948,6 +948,20 @@ class ERPVoucher(models.Model):
     voucher_date = models.DateField(default=date.today)
     entry_date = models.DateField(default=date.today)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_mode = models.CharField(max_length=30, choices=[
+        ('cash', 'Cash'),
+        ('bank_transfer', 'Bank Transfer'),
+        ('cheque', 'Cheque'),
+        ('mobile_banking', 'Mobile Banking (bKash/Nagad)'),
+        ('online', 'Online Transfer'),
+    ], default='cash')
+    bank_name = models.CharField(max_length=100, blank=True, null=True, default='')
+    cheque_number = models.CharField(max_length=50, blank=True, null=True, default='')
+    cheque_date = models.DateField(blank=True, null=True)
+    cheque_deposit_date = models.DateField(blank=True, null=True)
+    cheque_cleared = models.BooleanField(default=False)
+    cheque_cleared_date = models.DateField(blank=True, null=True)
+    cheque_notification_sent = models.BooleanField(default=False)
     description = models.TextField(blank=True, null=True, default='')
     booking = models.ForeignKey(
         ERPBooking, on_delete=models.SET_NULL,

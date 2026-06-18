@@ -484,12 +484,14 @@ class ERPVoucherSerializer(serializers.ModelSerializer):
     def get_approved_by_name(self, obj):
         return obj.approved_by.full_name if obj.approved_by else None
 
-    # ✅ approved voucher edit করা যাবে না
     def validate(self, data):
         if self.instance and self.instance.status == 'approved':
-            raise serializers.ValidationError(
-                'Approved voucher cannot be edited.'
-            )
+            allowed_updates = {'cheque_cleared', 'cheque_cleared_date', 'cheque_notification_sent'}
+            keys_being_updated = set(data.keys())
+            if not keys_being_updated.issubset(allowed_updates):
+                raise serializers.ValidationError(
+                    'Approved voucher cannot be edited (except cheque clearance).'
+                )
         return data
     
 
