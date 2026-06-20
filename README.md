@@ -1,364 +1,229 @@
-# 🏢 Azmira Real Estate ERP — Backend API
+<div align="center">
+  <h1>🏢 Azmira Real Estate ERP — Backend API</h1>
+  <p><strong>A production-ready, highly modular Real Estate ERP system built with Django REST Framework.</strong></p>
 
-A production-ready, modular **Real Estate ERP system** built with Django REST Framework. Designed to manage the full lifecycle of a real estate business — from land acquisition and project management to customer bookings, installment tracking, commission distribution, investor dividends, and HR payroll.
+  [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
+  [![Django](https://img.shields.io/badge/Django-5.x-green.svg)](https://www.djangoproject.com/)
+  [![DRF](https://img.shields.io/badge/DRF-red.svg)](https://www.django-rest-framework.org/)
+  [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Ready-blue.svg)](https://www.postgresql.org/)
+  [![License](https://img.shields.io/badge/License-Proprietary-yellow.svg)]()
+</div>
+
+<hr />
+
+## 📖 Overview
+
+Designed to manage the full lifecycle of a real estate business. This robust system handles everything from **land acquisition and project management** to **customer bookings, installment tracking, commission distribution (MLM style), investor dividends, accounting, and HR payroll**. 
 
 ---
 
 ## 🚀 Tech Stack
 
 | Layer | Technology |
-|---|---|
-| Language | Python 3.11+ |
-| Framework | Django 5.x + Django REST Framework |
-| Authentication | JWT (SimpleJWT) |
-| Database | PostgreSQL |
-| File Storage | Django Media / S3-compatible |
-| Image Processing | Pillow (auto WebP conversion) |
-| PDF Generation | WeasyPrint |
-| Filtering | django-filter |
-| Task Scheduling | Celery (planned) |
+| :--- | :--- |
+| **Language** | Python 3.11+ |
+| **Framework** | Django 5.x + Django REST Framework |
+| **Authentication** | JWT (SimpleJWT) |
+| **Database** | PostgreSQL |
+| **File Storage** | Django Media / S3-compatible |
+| **Image Processing** | Pillow (auto WebP conversion for optimized performance) |
+| **PDF Generation** | WeasyPrint |
+| **Filtering** | django-filter |
+| **Task Scheduling** | Celery (planned for asynchronous jobs) |
 
 ---
 
-## 📦 Core Modules
+## 📦 Core Modules & Features
 
-### 1. User & Authentication
-- Custom `ERPUser` model with JSON-based multi-role system
-- Roles: `super_admin`, `admin`, `accounts`, `employee`, `marketing_officer`, `marketing_manager`, `customer_care`, `hr`, `customer`, `investor`
-- JWT login with role-based access
-- Auto WebP image conversion on upload
+### 1. 🔐 User & Authentication (`ERPUser`, `ERPUserManager`)
+- **Custom Multi-Role System**: Users can have multiple JSON-based roles (`super_admin`, `admin`, `accounts`, `employee`, `marketing_officer`, `marketing_manager`, `customer_care`, `hr`, `customer`, `investor`).
+- **JWT Authentication**: Secure API access using JWT tokens.
+- **Image Optimization**: Auto WebP image conversion upon upload.
 
-### 2. Project Management
-- Full project CRUD with type classification (Lot, Flat, Commercial, Mixed)
-- Dynamic **Project Tab system** — admin creates custom tabs and assigns projects
-- Each tab returns project list + total count
-- Filter by status, city, district, upazila, price range, land area
+### 2. 🏗️ Project Management (`Project`)
+- Full project CRUD with type classification (Plot, Flat, Both).
+- **Dynamic Project Tabs**: Admin can create custom tabs and assign projects to them.
+- Deep filtering by status, city, district, upazila, price range, and land area.
 
-### 3. Plot / Flat Management
-- Plot inventory per project with status tracking (available, booked, sold, hold)
-- Rich filtering: price range, area range, facing direction, floor, bedrooms, bathrooms
-- Cross-project search via related project fields (city, district)
-- Featured plot listing
+### 3. 🏡 Plot / Flat Inventory (`Property`)
+- Plot inventory tracking (available, booked, sold, hold).
+- Rich filtering attributes (price range, area range, facing direction, floor, bedrooms, bathrooms).
+- Features plot/flat listing and cross-project searches.
 
-### 4. Land Acquisition
-- Track land owners, suppliers, dag/khatiyan numbers
-- Monitor payment status: Power of Attorney → Saf-Kabala
-- Mutation and survey tracking
-- Outstanding amount auto-calculation
+### 4. 🌍 Land Acquisition & Records (`ERPLandAcquisition`, `ERPLandOwner`, `ERPLandRecord`, `ERPSupplier`)
+- Track land owners, suppliers, and legal DAG/Khatiyan numbers.
+- Monitor payment lifecycle (Baina -> Power of Attorney → Saf-Kabala -> Namjari).
+- Mutation and survey tracking with auto-calculation of outstanding dues.
 
-### 5. Customer Management
-- Individual, Joint, and Corporate customer profiles
-- Source tracking (walk-in, referral, marketing, online)
-- NID image upload with WebP auto-conversion
-- Loyalty points system
+### 5. 👥 Customer Management (`ERPCustomer`)
+- Individual, Joint, and Corporate customer profiles.
+- **Source Tracking**: Walk-in, referral, marketing officer, online, etc.
+- Loyalty points system and NID image auto-conversion (WebP).
 
-### 6. Lead Management
-- Full lead pipeline: New → Contacted → Interested → Follow-up → Visit → Negotiating → Converted
-- Assign leads to marketing officers
-- Conversation log (JSON), follow-up scheduling
-- Lead-to-customer conversion tracking
+### 6. 🎯 Lead Management (`ERPLead`)
+- **Full Pipeline**: New → Contacted → Interested → Follow-up → Visit → Negotiating → Converted.
+- Assigned leads to specific marketing officers.
+- Real-time conversation logging and automated follow-up scheduling.
 
-### 7. Booking System
-- Booking with token, down payment, and installment tracking
-- Token expiry logic: ≤500 tk = 30 days, ≤1000 tk = 60 days, >1000 tk = 90 days
-- Auto `final_price`, `total_paid`, `total_due` calculation
-- Booking transfer with service charge
-- Cancellation with refund tracking
+### 7. 📑 Booking System (`ERPBooking`)
+- End-to-end booking logic handling token, down payment, and active installments.
+- **Dynamic Token Expiry**: ≤500 BDT = 30 days, ≤1000 BDT = 60 days, >1000 BDT = 90 days.
+- Auto calculation of `final_price`, `total_paid`, and `total_due`.
+- Booking transfer feature (with service charge) and cancellation with refund processing.
 
-### 8. Installment Plan
-- Auto-generate monthly installment schedule from booking
-- Per-installment paid/due tracking
-- Booking totals auto-update on installment save
-- SMS reminder flags (48h before, on due date)
+### 8. 💸 Installment Plan (`ERPInstallmentPlan`)
+- One-click generation of monthly installment schedules from a confirmed booking.
+- Per-installment paid/due tracking.
+- Pre-due SMS reminder flags (e.g., 48 hours before, on the due date).
 
-### 9. Money Receipt (3-stage Approval)
-- `Pending → Complete → Authorized` workflow
-- Payment modes: Cash, Bank Transfer, Cheque, Mobile Banking (bKash/Nagad)
-- Cheque clearance tracking (30-day expiry alert)
-- PDF receipt download via WeasyPrint
-- E-signature support
+### 9. 🧾 Money Receipt & Transactions (`ERPMoneyReceipt`, `Transaction`)
+- **3-Stage Approval Workflow**: `Pending → Complete → Authorized`.
+- Multiple payment modes supported (Cash, Bank Transfer, Cheque, Mobile Banking).
+- PDF receipt generation powered by WeasyPrint.
 
-### 10. Voucher System
-- Debit, Credit, Journal, Contra voucher types
-- `Draft → Approved → Rejected` workflow
-- Approved vouchers are locked (no edit/delete)
-- Linked to account heads, customers, and bookings
+### 10. 📊 Accounting & Voucher System (`ERPVoucher`, `ERPAccountHead`)
+- Debit, Credit, Journal, and Contra voucher types.
+- **Chart of Accounts**: Parent-child hierarchy (Income, Expense, Asset, Liability, Equity).
+- Voucher locking mechanisms (Approved vouchers cannot be altered).
 
-### 11. Multi-level Commission Engine
-- Configurable commission rules per project per source type
-- Source types: `booking`, `installment`, `down_payment`, `registration`, `land_dev`, `parking`, `transfer`, `utility`
-- Supports up to 10 upline generations
-- Auto wallet credit on commission generation
-- Commission dashboard with Generation × Source-Type matrix
+### 11. 💰 Multi-level Commission Engine (`ERPCommissionRule`, `ERPCommission`)
+- Highly configurable commission rules per project per source type (e.g., `booking`, `installment`, `registration`, `land_dev`).
+- **MLM Upline Calculation**: Supports up to 10 upline generations.
+- Auto wallet crediting when commission is generated.
 
-### 12. Marketing Officer System
-- Hierarchical upline/downline structure
-- Rank progression: Officer → Team Leader → AGM → GM
-- Auto role assignment via Django signals
-- TA/DA, mobile recharge, and withdrawal request management
+### 12. 📈 Marketing Officer Hierarchies (`ERPMarketingOfficer`, `ERPOfficerRequest`)
+- Upline/Downline structural tracking.
+- **Rank Progression System**: Officer → Team Leader → AGM → GM.
+- TA/DA, mobile recharge, and commission withdrawal management.
 
-### 13. Wallet System
-- One wallet per user, type-matched to role
-- Wallet types: `marketing`, `investor`, `customer`, `customer_care`, `employee`, `accounts`, `admin`, `general`
-- Full transaction log with `balance_before` / `balance_after`
-- Minimum withdrawal: 1000 tk
-- Loan balance auto-deducted on withdrawal
+### 13. 💳 Wallet System (`ERPWallet`, `ERPWalletTransaction`)
+- Centralized wallet ecosystem. One wallet per user, type-matched to their role.
+- Transparent transaction logs (`balance_before` / `balance_after`).
+- Loan auto-deduction integrations upon withdrawal requests.
 
-### 14. Investor & Investment
-- Investor profiles linked to marketing officers
-- Investment tracking with maturity date and monthly dividend rate
-- Auto dividend calculation and wallet credit
-- Land Power Assignment (% based land conversion)
-- Partial and full return tracking
+### 14. 🤝 Investor & Investments (`ERPInvestor`, `ERPInvestment`, `ERPDividend`, `LandPowerAssignment`)
+- Investment maturity dates and monthly dividend rate tracking.
+- Auto-dividend generation and immediate wallet credit.
+- Land Power Assignment tracking based on land conversion percentages.
 
-### 15. HR Module
-- Employee management with employment type (permanent, contract, probation, intern)
-- Daily attendance tracking (present, absent, late, half-day, leave)
-- Monthly payroll auto-calculation from attendance
-- Loan deduction from salary
+### 15. 🏢 HR & Payroll Module (`ERPEmployee`, `ERPAttendance`, `ERPPayroll`, `ERPHoliday`)
+- Detailed employee profiles (Permanent, Contract, Probation, Intern).
+- Daily attendance tracking (Present, Absent, Late, Leave).
+- **Automated Payroll**: Auto-calculates monthly salary from attendance, factoring in loan deductions.
 
-### 16. Project Visit Tracking
-- Schedule, confirm, and complete site visits
-- Track guest/lead/customer visit outcomes
-- 24h and 2h notification flags
+### 16. 📅 Project Visit Tracking (`ERPProjectVisit`)
+- Schedule, confirm, and complete site visits for leads/customers.
+- SMS/Email Notification triggers (24h and 2h before visit).
 
-### 17. Offer & Discount Portal
-- Create seasonal, Eid, or special offers
-- Per-project or global targeting
-- Offer validity max 90 days (enforced at API level)
-- SMS notification tracking
+### 17. 🎁 Offers & Discounts (`ERPOffer`)
+- Create seasonal campaigns with global or per-project targeting.
+- Enforced max validity periods via the API layer.
 
-### 18. SMS Log
-- Comprehensive SMS event tracking
-- Types: installment reminder, payment received, welcome, offer, commission, admin notification
-- Linked to customer, booking, or marketing officer
+### 18. 📱 SMS Logging (`ERPSMSLog`)
+- Universal SMS event tracking across modules (installments, payments, offers).
 
-### 19. Document Management
-- Store and categorize legal documents (MOU, Deed, Agreement, Namjari, Porcha)
-- Linked to booking, project, or customer
-- E-signature support
+### 19. 📂 Document Management (`ERPDocument`)
+- Secure vault for storing legal documents (MOU, Deed, Agreement, Porcha).
 
-### 20. Account Heads & Vouchers
-- Chart of accounts with parent-child hierarchy
-- Account types: income, expense, asset, liability, equity
-- Opening and current balance tracking
+### 20. 💻 Assets & Logistics (`ERPCompanyAsset`)
+- Track inventory assigned to employees (Mobiles, SIMs, Vehicles, Laptops) with condition logging upon return.
 
-### 21. Company Assets (Logistics)
-- Track mobile, SIM, vehicle, laptop assignment
-- Return tracking and condition notes
-
-### 22. System Log
-- Full audit trail of user actions
-- Module-level log with IP address tracking
-- Log levels: info, warning, error
+### 21. 🛠️ System Logs (`ERPSystemLog`)
+- Full audit trail of user actions, module-level logging, and IP tracking.
 
 ---
 
-## 🔌 API Overview
+## ⚙️ Core Architecture Details
 
-All endpoints follow RESTful conventions. Base URL: `/api/`
+### 🔄 Django Signals Architecture
+Django signals are heavily utilized to auto-manage role assignments and wallet creation seamlessly:
+- **`ERPUser` saved**: Associated wallet auto-created (type matched via role logic).
+- **`ERPMarketingOfficer`**: Auto-assigns `marketing_officer` role.
+- **`ERPInvestor`**: Auto-assigns `investor` role & provisions investor wallet.
+- **`ERPCustomer`**: Auto-assigns `customer` role & provisions customer wallet.
 
-### Key Endpoints
-
-```
-Auth
-  POST   /api/erp-users/login/
-  POST   /api/erp-users/new/
-  GET    /api/erp-users/role/<role>/
-
-Projects
-  GET    /api/erp-projects/           ?city=&district=&status=&project_type=&min_value=&max_value=
-  GET    /api/tab-summary/
-  GET    /api/project-tabs/<id>/projects/
-  POST   /api/project-tabs/create/
-  PATCH  /api/projects/<id>/assign-tab/
-  POST   /api/project-tabs/<id>/assign-projects/
-
-Plots
-  GET    /api/erp-plots/              ?status=&min_price=&max_price=&min_area=&max_area=&facing=&city=
-  GET    /api/erp-plots/featured/
-
-Bookings
-  GET    /api/erp-bookings/           ?customer=&project=&status=
-  POST   /api/erp-bookings/new/
-  POST   /api/generate-installment-schedule/
-  GET    /api/installments/<booking_code>/
-
-Payments
-  POST   /api/erp-receipts/new/
-  PATCH  /api/erp-receipts/<id>/      (status: pending → complete → authorized)
-  GET    /api/erp-receipts/<id>/download/
-
-Commission
-  POST   /api/generate-commission/
-  GET    /api/commission-dashboard/
-  GET    /api/commission-dashboard/officer/<id>/
-
-Wallet
-  GET    /api/erp-wallets/user/<user_id>/
-  POST   /api/erp-wallet-transactions/new/
-
-Investor
-  POST   /api/erp-dividends/new/
-
-HR
-  GET    /api/erp-attendance/         ?employee=&month=&year=
-  POST   /api/erp-payroll/new/
-
-Land
-  GET    /api/erp-land-acquisitions/  ?supplier=&land_status=&min_area=&max_area=
-```
+### 💵 Commission Calculation Flow
+1. **Trigger**: Customer pays an installment.
+2. **Action**: `POST /api/generate-commission/` is called.
+3. **Engine Check**: System identifies the marketing officer assigned to the booking.
+4. **Traversal**: Engine walks the upline chain (Generation 0 → N).
+5. **Rule Matching**: System checks `ERPCommissionRule` for each level.
+6. **Execution**: Creates `ERPCommission` records and automatically credits wallets via `ERPWalletTransaction`.
 
 ---
 
-## ⚙️ Signal Architecture
+## 🔌 API Quick Reference
 
-Django signals auto-manage roles and wallets:
+All endpoints follow RESTful standards. Base URL is `/api/`.
 
-```
-ERPUser saved       → wallet auto-created (type based on role)
-ERPMarketingOfficer → role: marketing_officer / marketing_manager added
-ERPInvestor         → role: investor added + investor wallet ensured
-ERPEmployee         → role: employee added
-ERPCustomer         → role: customer added + customer wallet ensured
-```
+**Auth & Users**
+- `POST /api/erp-users/login/` (JWT Login)
+- `GET /api/erp-users/role/<role>/`
 
----
+**Projects & Properties**
+- `GET /api/erp-projects/?city=&status=&project_type=`
+- `GET /api/erp-plots/?status=&min_price=&max_price=&facing=`
 
-## 🗂️ Project Structure
+**Bookings & Payments**
+- `POST /api/erp-bookings/new/`
+- `POST /api/generate-installment-schedule/`
+- `POST /api/erp-receipts/new/`
+- `GET /api/erp-receipts/<id>/download/`
 
-```
-project_root/
-│
-├── mainapp/
-│   ├── models.py         # 26 models — full ERP domain
-│   ├── serializers.py    # All serializers with display fields
-│   ├── signals.py        # Auto role + wallet management
-│   └── services.py       # Commission generation engine
-│
-├── api/
-│   ├── views.py          # All API views (CRUD + business logic)
-│   └── urls.py           # URL routing
-│
-└── core/
-    └── filters.py        # django-filter FilterSets (Plot, Project, Land)
-```
+**Financials**
+- `POST /api/generate-commission/`
+- `GET /api/erp-wallets/user/<user_id>/`
+
+*Detailed Swagger / Postman collections available internally.*
 
 ---
 
 ## 🛠️ Setup & Installation
 
+**1. Clone the Repository**
 ```bash
-# 1. Clone the repository
 git clone https://github.com/yourusername/azmira-erp-backend.git
 cd azmira-erp-backend
+```
 
-# 2. Create virtual environment
+**2. Virtual Environment Setup**
+```bash
 python -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
+```
 
-# 3. Install dependencies
+**3. Install Dependencies**
+```bash
 pip install -r requirements.txt
+```
 
-# 4. Environment variables
+**4. Environment Variables**
+```bash
 cp .env.example .env
-# .env এ DATABASE_URL, SECRET_KEY, MEDIA_ROOT set করুন
+# Edit .env and configure DATABASE_URL, SECRET_KEY, and MEDIA_ROOT
+```
 
-# 5. Database setup
+**5. Database Setup & Run**
+```bash
 python manage.py makemigrations
 python manage.py migrate
-
-# 6. Create superuser
 python manage.py createsuperuser
-
-# 7. Run server
 python manage.py runserver
 ```
 
 ---
 
-## 🔐 Authentication
+## 📄 License & Ownership
 
-JWT token based authentication:
-
-```bash
-# Login
-POST /api/erp-users/login/
-{
-  "username": "admin",
-  "password": "your_password"
-}
-
-# Response
-{
-  "tokens": {
-    "access": "eyJ...",
-    "refresh": "eyJ..."
-  },
-  "user": { ... }
-}
-
-# Use token in header
-Authorization: Bearer eyJ...
-```
+This project is proprietary software developed explicitly for **Azmira Real Estate**. All rights reserved.
 
 ---
 
-## 📊 Commission System — How It Works
+## 👨‍💻 Developed By
 
-```
-Customer pays installment
-        ↓
-POST /api/generate-commission/
-{ "booking": 5, "amount": 25000, "source_type": "installment" }
-        ↓
-System finds marketing officer of the booking
-        ↓
-Walks up upline chain (Gen 0 → Gen 7)
-        ↓
-For each generation, checks ERPCommissionRule
-        ↓
-Creates ERPCommission + credits officer wallet
-        ↓
-Full transaction log in ERPWalletTransaction
-```
-
----
-
-## 🧪 Filter Examples
-
-```bash
-# Plot filters
-GET /api/erp-plots/?min_price=500000&max_price=2000000&status=available
-GET /api/erp-plots/?city=Dhaka&facing=north&bedrooms=3
-GET /api/erp-plots/?search=A-01&ordering=-final_price
-
-# Project filters
-GET /api/erp-projects/?status=active&district=Gazipur
-GET /api/erp-projects/?project_type=flat&min_value=10000000
-GET /api/erp-projects/?search=Azmira&ordering=-created_at
-
-# Land acquisition filters
-GET /api/erp-land-acquisitions/?land_status=saf_kabala&is_mutated=true
-GET /api/erp-land-acquisitions/?min_area=10&max_area=50
-```
-
----
-
-## 📄 License
-
-This project is proprietary software developed for **Azmira Real Estate**. All rights reserved.
-
----
-
-## 👨‍💻 Developer
-
-**[Arjun Mazumder]**
-Backend Developer — Django REST Framework  
+**Arjun Mazumder**  
+*Backend Developer — Django REST Framework*  
 📧 arjumazumder2@gmail.com  
-🔗 [www.linkedin.com/in/arzunmazumder] 
-🐙 [github.com/arjunmazumder]
+🔗 [LinkedIn](https://www.linkedin.com/in/arzunmazumder) | 🐙 [GitHub](https://github.com/arjunmazumder)
 
----
-
-> Built with Django REST Framework · PostgreSQL · JWT Auth · WeasyPrint · django-filter
+> *Built with ❤️ using Django REST Framework · PostgreSQL · JWT Auth · Celery · WeasyPrint*
